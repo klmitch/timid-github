@@ -587,6 +587,20 @@ class GithubExtension(timid.Extension):
         if args.github_override_url:
             final_status['url'] = args.github_override_url
 
+        # Set some variables in the context for the use of any callers
+        ctxt.variables['github_api'] = args.github_api
+        ctxt.variables['github_repo_name'] = repo_name
+        ctxt.variables['github_pull'] = '%s#%d' % (pull.base.repo.full_name,
+                                                   pull.number)
+        ctxt.variables['github_base_repo'] = repo_url
+        ctxt.variables['github_base_branch'] = repo_branch
+        ctxt.variables['github_change_repo'] = change_url
+        ctxt.variables['github_change_branch'] = change_branch
+        ctxt.variables['github_success_status'] = final_status['status']
+        ctxt.variables['github_success_text'] = final_status['text']
+        ctxt.variables['github_success_url'] = final_status['url']
+        ctxt.variables['github_status_url'] = args.github_status_url
+
         # We are all set; initialize the extension
         return cls(gh, pull, last_commit, args.github_status_url, final_status,
                    repo_name, repo_url, repo_branch, change_url, change_branch)
