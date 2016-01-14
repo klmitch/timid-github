@@ -562,7 +562,7 @@ class TestGithubExtension(unittest.TestCase):
                        return_value=None)
     def test_activate_base(self, mock_init, mock_select_url, mock_set_password,
                            mock_get_password, mock_Github, mock_getpass):
-        ctxt = mock.Mock(variables={})
+        ctxt = mock.Mock()
         pull = self.make_pull(mock_Github)
         args = mock.Mock(
             github_pull='some/repo#5',
@@ -597,19 +597,25 @@ class TestGithubExtension(unittest.TestCase):
             mock.call('https://example.com/repo', pull.head.repo),
         ])
         self.assertEqual(mock_select_url.call_count, 2)
-        self.assertEqual(ctxt.variables, {
-            'github_api': 'https://api.github.com',
-            'github_repo_name': 'repo',
-            'github_pull': 'some/repo#5',
-            'github_base_repo': 'repo-url',
-            'github_base_branch': 'branch',
-            'github_change_repo': 'change-repo-url',
-            'github_change_branch': 'change-branch',
-            'github_success_status': 'success',
-            'github_success_text': 'Tests passed!',
-            'github_success_url': None,
-            'github_status_url': None,
-        })
+        ctxt.variables.assert_has_calls([
+            mock.call.declare_sensitive('github_api_password'),
+            mock.call.update({
+                'github_api': 'https://api.github.com',
+                'github_api_username': 'example',
+                'github_api_password': 'from_keyring',
+                'github_repo_name': 'repo',
+                'github_pull': 'some/repo#5',
+                'github_base_repo': 'repo-url',
+                'github_base_branch': 'branch',
+                'github_change_repo': 'change-repo-url',
+                'github_change_branch': 'change-branch',
+                'github_success_status': 'success',
+                'github_success_text': 'Tests passed!',
+                'github_success_url': None,
+                'github_status_url': None,
+            }),
+        ])
+        self.assertEqual(len(ctxt.variables.method_calls), 2)
         mock_init.assert_called_once_with(
             gh, pull, pull._last_commit, None, {
                 'status': 'success',
@@ -631,7 +637,7 @@ class TestGithubExtension(unittest.TestCase):
     def test_activate_nopull(self, mock_init, mock_select_url,
                              mock_set_password, mock_get_password, mock_Github,
                              mock_getpass):
-        ctxt = mock.Mock(variables={})
+        ctxt = mock.Mock()
         pull = self.make_pull(mock_Github)
         args = mock.Mock(
             github_pull=None,
@@ -656,7 +662,7 @@ class TestGithubExtension(unittest.TestCase):
         self.assertFalse(mock_set_password.called)
         self.assertFalse(mock_Github.called)
         self.assertFalse(mock_select_url.called)
-        self.assertEqual(ctxt.variables, {})
+        self.assertEqual(len(ctxt.variables.method_calls), 0)
         self.assertFalse(mock_init.called)
 
     @mock.patch.object(timid_github.getpass, 'getpass',
@@ -672,7 +678,7 @@ class TestGithubExtension(unittest.TestCase):
     def test_activate_withpass(self, mock_init, mock_select_url,
                                mock_set_password, mock_get_password,
                                mock_Github, mock_getpass):
-        ctxt = mock.Mock(variables={})
+        ctxt = mock.Mock()
         pull = self.make_pull(mock_Github)
         args = mock.Mock(
             github_pull='some/repo#5',
@@ -706,19 +712,25 @@ class TestGithubExtension(unittest.TestCase):
             mock.call('https://example.com/repo', pull.head.repo),
         ])
         self.assertEqual(mock_select_url.call_count, 2)
-        self.assertEqual(ctxt.variables, {
-            'github_api': 'https://api.github.com',
-            'github_repo_name': 'repo',
-            'github_pull': 'some/repo#5',
-            'github_base_repo': 'repo-url',
-            'github_base_branch': 'branch',
-            'github_change_repo': 'change-repo-url',
-            'github_change_branch': 'change-branch',
-            'github_success_status': 'success',
-            'github_success_text': 'Tests passed!',
-            'github_success_url': None,
-            'github_status_url': None,
-        })
+        ctxt.variables.assert_has_calls([
+            mock.call.declare_sensitive('github_api_password'),
+            mock.call.update({
+                'github_api': 'https://api.github.com',
+                'github_api_username': 'example',
+                'github_api_password': 'from_cli',
+                'github_repo_name': 'repo',
+                'github_pull': 'some/repo#5',
+                'github_base_repo': 'repo-url',
+                'github_base_branch': 'branch',
+                'github_change_repo': 'change-repo-url',
+                'github_change_branch': 'change-branch',
+                'github_success_status': 'success',
+                'github_success_text': 'Tests passed!',
+                'github_success_url': None,
+                'github_status_url': None,
+            }),
+        ])
+        self.assertEqual(len(ctxt.variables.method_calls), 2)
         mock_init.assert_called_once_with(
             gh, pull, pull._last_commit, None, {
                 'status': 'success',
@@ -740,7 +752,7 @@ class TestGithubExtension(unittest.TestCase):
     def test_activate_nokeyring(self, mock_init, mock_select_url,
                                 mock_set_password, mock_get_password,
                                 mock_Github, mock_getpass):
-        ctxt = mock.Mock(variables={})
+        ctxt = mock.Mock()
         pull = self.make_pull(mock_Github)
         args = mock.Mock(
             github_pull='some/repo#5',
@@ -776,19 +788,25 @@ class TestGithubExtension(unittest.TestCase):
             mock.call('https://example.com/repo', pull.head.repo),
         ])
         self.assertEqual(mock_select_url.call_count, 2)
-        self.assertEqual(ctxt.variables, {
-            'github_api': 'https://api.github.com',
-            'github_repo_name': 'repo',
-            'github_pull': 'some/repo#5',
-            'github_base_repo': 'repo-url',
-            'github_base_branch': 'branch',
-            'github_change_repo': 'change-repo-url',
-            'github_change_branch': 'change-branch',
-            'github_success_status': 'success',
-            'github_success_text': 'Tests passed!',
-            'github_success_url': None,
-            'github_status_url': None,
-        })
+        ctxt.variables.assert_has_calls([
+            mock.call.declare_sensitive('github_api_password'),
+            mock.call.update({
+                'github_api': 'https://api.github.com',
+                'github_api_username': 'example',
+                'github_api_password': 'from_keyboard',
+                'github_repo_name': 'repo',
+                'github_pull': 'some/repo#5',
+                'github_base_repo': 'repo-url',
+                'github_base_branch': 'branch',
+                'github_change_repo': 'change-repo-url',
+                'github_change_branch': 'change-branch',
+                'github_success_status': 'success',
+                'github_success_text': 'Tests passed!',
+                'github_success_url': None,
+                'github_status_url': None,
+            }),
+        ])
+        self.assertEqual(len(ctxt.variables.method_calls), 2)
         mock_init.assert_called_once_with(
             gh, pull, pull._last_commit, None, {
                 'status': 'success',
@@ -810,7 +828,7 @@ class TestGithubExtension(unittest.TestCase):
     def test_activate_set_keyring(self, mock_init, mock_select_url,
                                   mock_set_password, mock_get_password,
                                   mock_Github, mock_getpass):
-        ctxt = mock.Mock(variables={})
+        ctxt = mock.Mock()
         pull = self.make_pull(mock_Github)
         args = mock.Mock(
             github_pull='some/repo#5',
@@ -846,19 +864,25 @@ class TestGithubExtension(unittest.TestCase):
             mock.call('https://example.com/repo', pull.head.repo),
         ])
         self.assertEqual(mock_select_url.call_count, 2)
-        self.assertEqual(ctxt.variables, {
-            'github_api': 'https://api.github.com',
-            'github_repo_name': 'repo',
-            'github_pull': 'some/repo#5',
-            'github_base_repo': 'repo-url',
-            'github_base_branch': 'branch',
-            'github_change_repo': 'change-repo-url',
-            'github_change_branch': 'change-branch',
-            'github_success_status': 'success',
-            'github_success_text': 'Tests passed!',
-            'github_success_url': None,
-            'github_status_url': None,
-        })
+        ctxt.variables.assert_has_calls([
+            mock.call.declare_sensitive('github_api_password'),
+            mock.call.update({
+                'github_api': 'https://api.github.com',
+                'github_api_username': 'example',
+                'github_api_password': 'from_keyboard',
+                'github_repo_name': 'repo',
+                'github_pull': 'some/repo#5',
+                'github_base_repo': 'repo-url',
+                'github_base_branch': 'branch',
+                'github_change_repo': 'change-repo-url',
+                'github_change_branch': 'change-branch',
+                'github_success_status': 'success',
+                'github_success_text': 'Tests passed!',
+                'github_success_url': None,
+                'github_status_url': None,
+            }),
+        ])
+        self.assertEqual(len(ctxt.variables.method_calls), 2)
         mock_init.assert_called_once_with(
             gh, pull, pull._last_commit, None, {
                 'status': 'success',
@@ -880,7 +904,7 @@ class TestGithubExtension(unittest.TestCase):
     def test_activate_empty_pull_number(self, mock_init, mock_select_url,
                                         mock_set_password, mock_get_password,
                                         mock_Github, mock_getpass):
-        ctxt = mock.Mock(variables={})
+        ctxt = mock.Mock()
         pull = self.make_pull(mock_Github)
         args = mock.Mock(
             github_pull='some/repo#',
@@ -911,7 +935,7 @@ class TestGithubExtension(unittest.TestCase):
         self.assertFalse(gh.get_repo.return_value.get_pull.called)
         self.assertFalse(gh.create_from_raw_data.called)
         self.assertFalse(mock_select_url.called)
-        self.assertEqual(ctxt.variables, {})
+        self.assertEqual(len(ctxt.variables.method_calls), 0)
         self.assertFalse(mock_init.called)
 
     @mock.patch.object(timid_github.getpass, 'getpass',
@@ -927,7 +951,7 @@ class TestGithubExtension(unittest.TestCase):
     def test_activate_bad_pull_number(self, mock_init, mock_select_url,
                                       mock_set_password, mock_get_password,
                                       mock_Github, mock_getpass):
-        ctxt = mock.Mock(variables={})
+        ctxt = mock.Mock()
         pull = self.make_pull(mock_Github)
         args = mock.Mock(
             github_pull='some/repo#x',
@@ -958,7 +982,7 @@ class TestGithubExtension(unittest.TestCase):
         self.assertFalse(gh.get_repo.return_value.get_pull.called)
         self.assertFalse(gh.create_from_raw_data.called)
         self.assertFalse(mock_select_url.called)
-        self.assertEqual(ctxt.variables, {})
+        self.assertEqual(len(ctxt.variables.method_calls), 0)
         self.assertFalse(mock_init.called)
 
     @mock.patch.object(timid_github.getpass, 'getpass',
@@ -975,7 +999,7 @@ class TestGithubExtension(unittest.TestCase):
                                      mock_set_password, mock_get_password,
                                      mock_Github, mock_getpass):
         mock_Github.return_value.get_repo.side_effect = TestException()
-        ctxt = mock.Mock(variables={})
+        ctxt = mock.Mock()
         args = mock.Mock(
             github_pull='some/repo#5',
             github_api='https://api.github.com',
@@ -1005,7 +1029,7 @@ class TestGithubExtension(unittest.TestCase):
         self.assertFalse(gh.get_repo.return_value.get_pull.called)
         self.assertFalse(gh.create_from_raw_data.called)
         self.assertFalse(mock_select_url.called)
-        self.assertEqual(ctxt.variables, {})
+        self.assertEqual(len(ctxt.variables.method_calls), 0)
         self.assertFalse(mock_init.called)
 
     @mock.patch.object(timid_github.getpass, 'getpass',
@@ -1021,7 +1045,7 @@ class TestGithubExtension(unittest.TestCase):
     def test_activate_unqualified_repo(self, mock_init, mock_select_url,
                                        mock_set_password, mock_get_password,
                                        mock_Github, mock_getpass):
-        ctxt = mock.Mock(variables={})
+        ctxt = mock.Mock()
         pull = self.make_pull(mock_Github)
         args = mock.Mock(
             github_pull='repo#5',
@@ -1056,19 +1080,25 @@ class TestGithubExtension(unittest.TestCase):
             mock.call('https://example.com/repo', pull.head.repo),
         ])
         self.assertEqual(mock_select_url.call_count, 2)
-        self.assertEqual(ctxt.variables, {
-            'github_api': 'https://api.github.com',
-            'github_repo_name': 'repo',
-            'github_pull': 'some/repo#5',
-            'github_base_repo': 'repo-url',
-            'github_base_branch': 'branch',
-            'github_change_repo': 'change-repo-url',
-            'github_change_branch': 'change-branch',
-            'github_success_status': 'success',
-            'github_success_text': 'Tests passed!',
-            'github_success_url': None,
-            'github_status_url': None,
-        })
+        ctxt.variables.assert_has_calls([
+            mock.call.declare_sensitive('github_api_password'),
+            mock.call.update({
+                'github_api': 'https://api.github.com',
+                'github_api_username': 'example',
+                'github_api_password': 'from_keyring',
+                'github_repo_name': 'repo',
+                'github_pull': 'some/repo#5',
+                'github_base_repo': 'repo-url',
+                'github_base_branch': 'branch',
+                'github_change_repo': 'change-repo-url',
+                'github_change_branch': 'change-branch',
+                'github_success_status': 'success',
+                'github_success_text': 'Tests passed!',
+                'github_success_url': None,
+                'github_status_url': None,
+            }),
+        ])
+        self.assertEqual(len(ctxt.variables.method_calls), 2)
         mock_init.assert_called_once_with(
             gh, pull, pull._last_commit, None, {
                 'status': 'success',
@@ -1090,7 +1120,7 @@ class TestGithubExtension(unittest.TestCase):
     def test_activate_json_pull(self, mock_init, mock_select_url,
                                 mock_set_password, mock_get_password,
                                 mock_Github, mock_getpass):
-        ctxt = mock.Mock(variables={})
+        ctxt = mock.Mock()
         pull = self.make_pull(mock_Github)
         args = mock.Mock(
             github_pull=json.dumps({'foo': 'bar'}),
@@ -1126,19 +1156,25 @@ class TestGithubExtension(unittest.TestCase):
             mock.call('https://example.com/repo', pull.head.repo),
         ])
         self.assertEqual(mock_select_url.call_count, 2)
-        self.assertEqual(ctxt.variables, {
-            'github_api': 'https://api.github.com',
-            'github_repo_name': 'repo',
-            'github_pull': 'some/repo#5',
-            'github_base_repo': 'repo-url',
-            'github_base_branch': 'branch',
-            'github_change_repo': 'change-repo-url',
-            'github_change_branch': 'change-branch',
-            'github_success_status': 'success',
-            'github_success_text': 'Tests passed!',
-            'github_success_url': None,
-            'github_status_url': None,
-        })
+        ctxt.variables.assert_has_calls([
+            mock.call.declare_sensitive('github_api_password'),
+            mock.call.update({
+                'github_api': 'https://api.github.com',
+                'github_api_username': 'example',
+                'github_api_password': 'from_keyring',
+                'github_repo_name': 'repo',
+                'github_pull': 'some/repo#5',
+                'github_base_repo': 'repo-url',
+                'github_base_branch': 'branch',
+                'github_change_repo': 'change-repo-url',
+                'github_change_branch': 'change-branch',
+                'github_success_status': 'success',
+                'github_success_text': 'Tests passed!',
+                'github_success_url': None,
+                'github_status_url': None,
+            }),
+        ])
+        self.assertEqual(len(ctxt.variables.method_calls), 2)
         mock_init.assert_called_once_with(
             gh, pull, pull._last_commit, None, {
                 'status': 'success',
@@ -1161,7 +1197,7 @@ class TestGithubExtension(unittest.TestCase):
                                             mock_set_password,
                                             mock_get_password, mock_Github,
                                             mock_getpass):
-        ctxt = mock.Mock(variables={})
+        ctxt = mock.Mock()
         pull = self.make_pull(mock_Github)
         args = mock.Mock(
             github_pull='some/repo#5',
@@ -1196,19 +1232,25 @@ class TestGithubExtension(unittest.TestCase):
             mock.call('https', pull.head.repo),
         ])
         self.assertEqual(mock_select_url.call_count, 2)
-        self.assertEqual(ctxt.variables, {
-            'github_api': 'https://api.github.com',
-            'github_repo_name': 'repo',
-            'github_pull': 'some/repo#5',
-            'github_base_repo': 'repo-url',
-            'github_base_branch': 'branch',
-            'github_change_repo': 'change-repo-url',
-            'github_change_branch': 'change-branch',
-            'github_success_status': 'success',
-            'github_success_text': 'Tests passed!',
-            'github_success_url': None,
-            'github_status_url': None,
-        })
+        ctxt.variables.assert_has_calls([
+            mock.call.declare_sensitive('github_api_password'),
+            mock.call.update({
+                'github_api': 'https://api.github.com',
+                'github_api_username': 'example',
+                'github_api_password': 'from_keyring',
+                'github_repo_name': 'repo',
+                'github_pull': 'some/repo#5',
+                'github_base_repo': 'repo-url',
+                'github_base_branch': 'branch',
+                'github_change_repo': 'change-repo-url',
+                'github_change_branch': 'change-branch',
+                'github_success_status': 'success',
+                'github_success_text': 'Tests passed!',
+                'github_success_url': None,
+                'github_status_url': None,
+            }),
+        ])
+        self.assertEqual(len(ctxt.variables.method_calls), 2)
         mock_init.assert_called_once_with(
             gh, pull, pull._last_commit, None, {
                 'status': 'success',
@@ -1230,7 +1272,7 @@ class TestGithubExtension(unittest.TestCase):
     def test_activate_override_compat(self, mock_init, mock_select_url,
                                       mock_set_password, mock_get_password,
                                       mock_Github, mock_getpass):
-        ctxt = mock.Mock(variables={})
+        ctxt = mock.Mock()
         pull = self.make_pull(mock_Github)
         args = mock.Mock(
             github_pull='some/repo#5',
@@ -1270,19 +1312,25 @@ class TestGithubExtension(unittest.TestCase):
             mock.call('https://example.com/repo', pull.head.repo),
         ])
         self.assertEqual(mock_select_url.call_count, 2)
-        self.assertEqual(ctxt.variables, {
-            'github_api': 'https://api.github.com',
-            'github_repo_name': 'repo',
-            'github_pull': 'some/repo#5',
-            'github_base_repo': 'repo-url',
-            'github_base_branch': 'branch',
-            'github_change_repo': 'change-repo-url',
-            'github_change_branch': 'change-branch',
-            'github_success_status': 'override',
-            'github_success_text': 'some text',
-            'github_success_url': 'some url',
-            'github_status_url': None,
-        })
+        ctxt.variables.assert_has_calls([
+            mock.call.declare_sensitive('github_api_password'),
+            mock.call.update({
+                'github_api': 'https://api.github.com',
+                'github_api_username': 'example',
+                'github_api_password': 'from_keyring',
+                'github_repo_name': 'repo',
+                'github_pull': 'some/repo#5',
+                'github_base_repo': 'repo-url',
+                'github_base_branch': 'branch',
+                'github_change_repo': 'change-repo-url',
+                'github_change_branch': 'change-branch',
+                'github_success_status': 'override',
+                'github_success_text': 'some text',
+                'github_success_url': 'some url',
+                'github_status_url': None,
+            }),
+        ])
+        self.assertEqual(len(ctxt.variables.method_calls), 2)
         mock_init.assert_called_once_with(
             gh, pull, pull._last_commit, None, {
                 'status': 'override',
@@ -1306,7 +1354,7 @@ class TestGithubExtension(unittest.TestCase):
                                                   mock_set_password,
                                                   mock_get_password,
                                                   mock_Github, mock_getpass):
-        ctxt = mock.Mock(variables={})
+        ctxt = mock.Mock()
         pull = self.make_pull(mock_Github)
         args = mock.Mock(
             github_pull='some/repo#5',
@@ -1345,19 +1393,25 @@ class TestGithubExtension(unittest.TestCase):
             mock.call('https://example.com/repo', pull.head.repo),
         ])
         self.assertEqual(mock_select_url.call_count, 2)
-        self.assertEqual(ctxt.variables, {
-            'github_api': 'https://api.github.com',
-            'github_repo_name': 'repo',
-            'github_pull': 'some/repo#5',
-            'github_base_repo': 'repo-url',
-            'github_base_branch': 'branch',
-            'github_change_repo': 'change-repo-url',
-            'github_change_branch': 'change-branch',
-            'github_success_status': 'override',
-            'github_success_text': 'Tests passed!',
-            'github_success_url': 'some url',
-            'github_status_url': None,
-        })
+        ctxt.variables.assert_has_calls([
+            mock.call.declare_sensitive('github_api_password'),
+            mock.call.update({
+                'github_api': 'https://api.github.com',
+                'github_api_username': 'example',
+                'github_api_password': 'from_keyring',
+                'github_repo_name': 'repo',
+                'github_pull': 'some/repo#5',
+                'github_base_repo': 'repo-url',
+                'github_base_branch': 'branch',
+                'github_change_repo': 'change-repo-url',
+                'github_change_branch': 'change-branch',
+                'github_success_status': 'override',
+                'github_success_text': 'Tests passed!',
+                'github_success_url': 'some url',
+                'github_status_url': None,
+            }),
+        ])
+        self.assertEqual(len(ctxt.variables.method_calls), 2)
         mock_init.assert_called_once_with(
             gh, pull, pull._last_commit, None, {
                 'status': 'override',
@@ -1380,7 +1434,7 @@ class TestGithubExtension(unittest.TestCase):
                                               mock_set_password,
                                               mock_get_password, mock_Github,
                                               mock_getpass):
-        ctxt = mock.Mock(variables={})
+        ctxt = mock.Mock()
         pull = self.make_pull(mock_Github)
         args = mock.Mock(
             github_pull='some/repo#5',
@@ -1415,19 +1469,25 @@ class TestGithubExtension(unittest.TestCase):
             mock.call('https://example.com/repo', pull.head.repo),
         ])
         self.assertEqual(mock_select_url.call_count, 2)
-        self.assertEqual(ctxt.variables, {
-            'github_api': 'https://api.github.com',
-            'github_repo_name': 'repo',
-            'github_pull': 'some/repo#5',
-            'github_base_repo': 'repo-url',
-            'github_base_branch': 'branch',
-            'github_change_repo': 'change-repo-url',
-            'github_change_branch': 'change-branch',
-            'github_success_status': 'success',
-            'github_success_text': 'Tests passed!',
-            'github_success_url': None,
-            'github_status_url': None,
-        })
+        ctxt.variables.assert_has_calls([
+            mock.call.declare_sensitive('github_api_password'),
+            mock.call.update({
+                'github_api': 'https://api.github.com',
+                'github_api_username': 'example',
+                'github_api_password': 'from_keyring',
+                'github_repo_name': 'repo',
+                'github_pull': 'some/repo#5',
+                'github_base_repo': 'repo-url',
+                'github_base_branch': 'branch',
+                'github_change_repo': 'change-repo-url',
+                'github_change_branch': 'change-branch',
+                'github_success_status': 'success',
+                'github_success_text': 'Tests passed!',
+                'github_success_url': None,
+                'github_status_url': None,
+            }),
+        ])
+        self.assertEqual(len(ctxt.variables.method_calls), 2)
         mock_init.assert_called_once_with(
             gh, pull, pull._last_commit, None, {
                 'status': 'success',
@@ -1449,7 +1509,7 @@ class TestGithubExtension(unittest.TestCase):
     def test_activate_override_status(self, mock_init, mock_select_url,
                                       mock_set_password, mock_get_password,
                                       mock_Github, mock_getpass):
-        ctxt = mock.Mock(variables={})
+        ctxt = mock.Mock()
         pull = self.make_pull(mock_Github)
         args = mock.Mock(
             github_pull='some/repo#5',
@@ -1484,19 +1544,25 @@ class TestGithubExtension(unittest.TestCase):
             mock.call('https://example.com/repo', pull.head.repo),
         ])
         self.assertEqual(mock_select_url.call_count, 2)
-        self.assertEqual(ctxt.variables, {
-            'github_api': 'https://api.github.com',
-            'github_repo_name': 'repo',
-            'github_pull': 'some/repo#5',
-            'github_base_repo': 'repo-url',
-            'github_base_branch': 'branch',
-            'github_change_repo': 'change-repo-url',
-            'github_change_branch': 'change-branch',
-            'github_success_status': 'status',
-            'github_success_text': 'Tests passed!',
-            'github_success_url': None,
-            'github_status_url': None,
-        })
+        ctxt.variables.assert_has_calls([
+            mock.call.declare_sensitive('github_api_password'),
+            mock.call.update({
+                'github_api': 'https://api.github.com',
+                'github_api_username': 'example',
+                'github_api_password': 'from_keyring',
+                'github_repo_name': 'repo',
+                'github_pull': 'some/repo#5',
+                'github_base_repo': 'repo-url',
+                'github_base_branch': 'branch',
+                'github_change_repo': 'change-repo-url',
+                'github_change_branch': 'change-branch',
+                'github_success_status': 'status',
+                'github_success_text': 'Tests passed!',
+                'github_success_url': None,
+                'github_status_url': None,
+            }),
+        ])
+        self.assertEqual(len(ctxt.variables.method_calls), 2)
         mock_init.assert_called_once_with(
             gh, pull, pull._last_commit, None, {
                 'status': 'status',
@@ -1518,7 +1584,7 @@ class TestGithubExtension(unittest.TestCase):
     def test_activate_override_text(self, mock_init, mock_select_url,
                                     mock_set_password, mock_get_password,
                                     mock_Github, mock_getpass):
-        ctxt = mock.Mock(variables={})
+        ctxt = mock.Mock()
         pull = self.make_pull(mock_Github)
         args = mock.Mock(
             github_pull='some/repo#5',
@@ -1553,19 +1619,25 @@ class TestGithubExtension(unittest.TestCase):
             mock.call('https://example.com/repo', pull.head.repo),
         ])
         self.assertEqual(mock_select_url.call_count, 2)
-        self.assertEqual(ctxt.variables, {
-            'github_api': 'https://api.github.com',
-            'github_repo_name': 'repo',
-            'github_pull': 'some/repo#5',
-            'github_base_repo': 'repo-url',
-            'github_base_branch': 'branch',
-            'github_change_repo': 'change-repo-url',
-            'github_change_branch': 'change-branch',
-            'github_success_status': 'success',
-            'github_success_text': 'text',
-            'github_success_url': None,
-            'github_status_url': None,
-        })
+        ctxt.variables.assert_has_calls([
+            mock.call.declare_sensitive('github_api_password'),
+            mock.call.update({
+                'github_api': 'https://api.github.com',
+                'github_api_username': 'example',
+                'github_api_password': 'from_keyring',
+                'github_repo_name': 'repo',
+                'github_pull': 'some/repo#5',
+                'github_base_repo': 'repo-url',
+                'github_base_branch': 'branch',
+                'github_change_repo': 'change-repo-url',
+                'github_change_branch': 'change-branch',
+                'github_success_status': 'success',
+                'github_success_text': 'text',
+                'github_success_url': None,
+                'github_status_url': None,
+            }),
+        ])
+        self.assertEqual(len(ctxt.variables.method_calls), 2)
         mock_init.assert_called_once_with(
             gh, pull, pull._last_commit, None, {
                 'status': 'success',
@@ -1587,7 +1659,7 @@ class TestGithubExtension(unittest.TestCase):
     def test_activate_override_url(self, mock_init, mock_select_url,
                                    mock_set_password, mock_get_password,
                                    mock_Github, mock_getpass):
-        ctxt = mock.Mock(variables={})
+        ctxt = mock.Mock()
         pull = self.make_pull(mock_Github)
         args = mock.Mock(
             github_pull='some/repo#5',
@@ -1622,19 +1694,25 @@ class TestGithubExtension(unittest.TestCase):
             mock.call('https://example.com/repo', pull.head.repo),
         ])
         self.assertEqual(mock_select_url.call_count, 2)
-        self.assertEqual(ctxt.variables, {
-            'github_api': 'https://api.github.com',
-            'github_repo_name': 'repo',
-            'github_pull': 'some/repo#5',
-            'github_base_repo': 'repo-url',
-            'github_base_branch': 'branch',
-            'github_change_repo': 'change-repo-url',
-            'github_change_branch': 'change-branch',
-            'github_success_status': 'success',
-            'github_success_text': 'Tests passed!',
-            'github_success_url': 'url',
-            'github_status_url': None,
-        })
+        ctxt.variables.assert_has_calls([
+            mock.call.declare_sensitive('github_api_password'),
+            mock.call.update({
+                'github_api': 'https://api.github.com',
+                'github_api_username': 'example',
+                'github_api_password': 'from_keyring',
+                'github_repo_name': 'repo',
+                'github_pull': 'some/repo#5',
+                'github_base_repo': 'repo-url',
+                'github_base_branch': 'branch',
+                'github_change_repo': 'change-repo-url',
+                'github_change_branch': 'change-branch',
+                'github_success_status': 'success',
+                'github_success_text': 'Tests passed!',
+                'github_success_url': 'url',
+                'github_status_url': None,
+            }),
+        ])
+        self.assertEqual(len(ctxt.variables.method_calls), 2)
         mock_init.assert_called_once_with(
             gh, pull, pull._last_commit, None, {
                 'status': 'success',
@@ -1658,7 +1736,7 @@ class TestGithubExtension(unittest.TestCase):
                                                  mock_set_password,
                                                  mock_get_password,
                                                  mock_Github, mock_getpass):
-        ctxt = mock.Mock(variables={})
+        ctxt = mock.Mock()
         pull = self.make_pull(mock_Github)
         args = mock.Mock(
             github_pull='some/repo#5',
@@ -1698,19 +1776,25 @@ class TestGithubExtension(unittest.TestCase):
             mock.call('https://example.com/repo', pull.head.repo),
         ])
         self.assertEqual(mock_select_url.call_count, 2)
-        self.assertEqual(ctxt.variables, {
-            'github_api': 'https://api.github.com',
-            'github_repo_name': 'repo',
-            'github_pull': 'some/repo#5',
-            'github_base_repo': 'repo-url',
-            'github_base_branch': 'branch',
-            'github_change_repo': 'change-repo-url',
-            'github_change_branch': 'change-branch',
-            'github_success_status': 'status',
-            'github_success_text': 'text',
-            'github_success_url': 'url',
-            'github_status_url': None,
-        })
+        ctxt.variables.assert_has_calls([
+            mock.call.declare_sensitive('github_api_password'),
+            mock.call.update({
+                'github_api': 'https://api.github.com',
+                'github_api_username': 'example',
+                'github_api_password': 'from_keyring',
+                'github_repo_name': 'repo',
+                'github_pull': 'some/repo#5',
+                'github_base_repo': 'repo-url',
+                'github_base_branch': 'branch',
+                'github_change_repo': 'change-repo-url',
+                'github_change_branch': 'change-branch',
+                'github_success_status': 'status',
+                'github_success_text': 'text',
+                'github_success_url': 'url',
+                'github_status_url': None,
+            }),
+        ])
+        self.assertEqual(len(ctxt.variables.method_calls), 2)
         mock_init.assert_called_once_with(
             gh, pull, pull._last_commit, None, {
                 'status': 'status',
@@ -1732,7 +1816,7 @@ class TestGithubExtension(unittest.TestCase):
     def test_activate_status_url(self, mock_init, mock_select_url,
                                  mock_set_password, mock_get_password,
                                  mock_Github, mock_getpass):
-        ctxt = mock.Mock(variables={})
+        ctxt = mock.Mock()
         pull = self.make_pull(mock_Github)
         args = mock.Mock(
             github_pull='some/repo#5',
@@ -1767,19 +1851,25 @@ class TestGithubExtension(unittest.TestCase):
             mock.call('https://example.com/repo', pull.head.repo),
         ])
         self.assertEqual(mock_select_url.call_count, 2)
-        self.assertEqual(ctxt.variables, {
-            'github_api': 'https://api.github.com',
-            'github_repo_name': 'repo',
-            'github_pull': 'some/repo#5',
-            'github_base_repo': 'repo-url',
-            'github_base_branch': 'branch',
-            'github_change_repo': 'change-repo-url',
-            'github_change_branch': 'change-branch',
-            'github_success_status': 'success',
-            'github_success_text': 'Tests passed!',
-            'github_success_url': 'https://status.example.com/',
-            'github_status_url': 'https://status.example.com/',
-        })
+        ctxt.variables.assert_has_calls([
+            mock.call.declare_sensitive('github_api_password'),
+            mock.call.update({
+                'github_api': 'https://api.github.com',
+                'github_api_username': 'example',
+                'github_api_password': 'from_keyring',
+                'github_repo_name': 'repo',
+                'github_pull': 'some/repo#5',
+                'github_base_repo': 'repo-url',
+                'github_base_branch': 'branch',
+                'github_change_repo': 'change-repo-url',
+                'github_change_branch': 'change-branch',
+                'github_success_status': 'success',
+                'github_success_text': 'Tests passed!',
+                'github_success_url': 'https://status.example.com/',
+                'github_status_url': 'https://status.example.com/',
+            }),
+        ])
+        self.assertEqual(len(ctxt.variables.method_calls), 2)
         mock_init.assert_called_once_with(
             gh, pull, pull._last_commit, 'https://status.example.com/', {
                 'status': 'success',
