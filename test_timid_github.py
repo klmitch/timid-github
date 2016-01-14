@@ -31,7 +31,7 @@ class TestException(Exception):
 
 
 class TestGit(unittest.TestCase):
-    def make_child(self, stdout='stdout', stderr='stderr', returncode=0):
+    def make_child(self, stdout=b'stdout', stderr=b'stderr', returncode=0):
         return mock.Mock(**{
             'communicate.return_value': (stdout, stderr),
             'returncode': returncode,
@@ -53,7 +53,7 @@ class TestGit(unittest.TestCase):
 
         result = timid_github._git(ctxt, 'spam', 'arg1', 'arg2')
 
-        self.assertEqual(result, 'stdout')
+        self.assertEqual(result, b'stdout')
         ctxt.environment.call.assert_called_once_with(
             ['git', 'spam', 'arg1', 'arg2'], close_fds=True,
             stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -77,7 +77,7 @@ class TestGit(unittest.TestCase):
         result = timid_github._git(ctxt, 'spam', 'arg1', 'arg2',
                                    do_raise=False)
 
-        self.assertEqual(result, 'stdout')
+        self.assertEqual(result, b'stdout')
         ctxt.environment.call.assert_called_once_with(
             ['git', 'spam', 'arg1', 'arg2'], close_fds=True,
             stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -88,13 +88,13 @@ class TestGit(unittest.TestCase):
         ctxt = self.make_ctxt(
             self.make_child(stdout=timid_github.SSH_ERROR, returncode=1),
             self.make_child(stderr=timid_github.SSH_ERROR, returncode=1),
-            self.make_child(stdout='final success'),
+            self.make_child(stdout=b'final success'),
         )
 
         result = timid_github._git(ctxt, 'spam', 'arg1', 'arg2',
                                    ssh_retries=5)
 
-        self.assertEqual(result, 'final success')
+        self.assertEqual(result, b'final success')
         ctxt.environment.call.assert_has_calls([
             mock.call(['git', 'spam', 'arg1', 'arg2'], close_fds=True,
                       stdout=subprocess.PIPE, stderr=subprocess.PIPE),
@@ -115,7 +115,7 @@ class TestGit(unittest.TestCase):
         ctxt = self.make_ctxt(
             self.make_child(stdout=timid_github.SSH_ERROR, returncode=1),
             self.make_child(stderr=timid_github.SSH_ERROR, returncode=1),
-            self.make_child(stdout='final success'),
+            self.make_child(stdout=b'final success'),
         )
 
         self.assertRaises(timid_github.GitException,
@@ -137,13 +137,13 @@ class TestGit(unittest.TestCase):
             self.make_child(stderr=timid_github.SSH_ERROR, returncode=1),
             self.make_child(stdout=timid_github.SSH_ERROR, returncode=1),
             self.make_child(stderr=timid_github.SSH_ERROR, returncode=1),
-            self.make_child(stdout='final success'),
+            self.make_child(stdout=b'final success'),
         )
 
         result = timid_github._git(ctxt, 'spam', 'arg1', 'arg2',
                                    ssh_retries=5)
 
-        self.assertEqual(result, 'final success')
+        self.assertEqual(result, b'final success')
         ctxt.environment.call.assert_has_calls([
             mock.call(['git', 'spam', 'arg1', 'arg2'], close_fds=True,
                       stdout=subprocess.PIPE, stderr=subprocess.PIPE),
