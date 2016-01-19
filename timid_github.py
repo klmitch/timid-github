@@ -232,8 +232,8 @@ class CloneAction(timid.Action):
 
         # Do some initial resets
         _git(ctxt, 'rebase', '--abort', do_raise=False)
-        _git(ctxt, 'checkout', '-f')
-        _git(ctxt, 'reset', '--hard')
+        _git(ctxt, 'checkout', '-f', self.ghe.repo_branch)
+        _git(ctxt, 'reset', '--hard', 'origin/%s' % self.ghe.repo_branch)
         _git(ctxt, 'clean', '-fdx')
 
         # And check out the designated branch

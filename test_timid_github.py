@@ -401,8 +401,8 @@ class TestCloneAction(unittest.TestCase):
         mock_git.assert_has_calls([
             mock.call('ctxt', 'remote', 'set-url', 'origin', 'repo://url'),
             mock.call('ctxt', 'rebase', '--abort', do_raise=False),
-            mock.call('ctxt', 'checkout', '-f'),
-            mock.call('ctxt', 'reset', '--hard'),
+            mock.call('ctxt', 'checkout', '-f', 'branch'),
+            mock.call('ctxt', 'reset', '--hard', 'origin/branch'),
             mock.call('ctxt', 'clean', '-fdx'),
             mock.call('ctxt', 'fetch', 'origin', 'branch', ssh_retries=5),
             mock.call('ctxt', 'checkout', 'branch'),
