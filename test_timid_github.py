@@ -552,7 +552,9 @@ class TestGithubExtension(unittest.TestCase):
 
     @mock.patch.object(timid_github.getpass, 'getpass',
                        return_value='from_keyboard')
-    @mock.patch.object(timid_github.github, 'Github')
+    @mock.patch.object(timid_github.github, 'Github', **{
+        'return_value.get_user.return_value.login': 'example',
+    })
     @mock.patch.object(timid_github.keyring, 'get_password',
                        return_value='from_keyring')
     @mock.patch.object(timid_github.keyring, 'set_password')
@@ -626,7 +628,9 @@ class TestGithubExtension(unittest.TestCase):
 
     @mock.patch.object(timid_github.getpass, 'getpass',
                        return_value='from_keyboard')
-    @mock.patch.object(timid_github.github, 'Github')
+    @mock.patch.object(timid_github.github, 'Github', **{
+        'return_value.get_user.return_value.login': 'example',
+    })
     @mock.patch.object(timid_github.keyring, 'get_password',
                        return_value='from_keyring')
     @mock.patch.object(timid_github.keyring, 'set_password')
@@ -667,7 +671,9 @@ class TestGithubExtension(unittest.TestCase):
 
     @mock.patch.object(timid_github.getpass, 'getpass',
                        return_value='from_keyboard')
-    @mock.patch.object(timid_github.github, 'Github')
+    @mock.patch.object(timid_github.github, 'Github', **{
+        'return_value.get_user.return_value.login': 'example',
+    })
     @mock.patch.object(timid_github.keyring, 'get_password',
                        return_value='from_keyring')
     @mock.patch.object(timid_github.keyring, 'set_password')
@@ -741,7 +747,9 @@ class TestGithubExtension(unittest.TestCase):
 
     @mock.patch.object(timid_github.getpass, 'getpass',
                        return_value='from_keyboard')
-    @mock.patch.object(timid_github.github, 'Github')
+    @mock.patch.object(timid_github.github, 'Github', **{
+        'return_value.get_user.return_value.login': 'example',
+    })
     @mock.patch.object(timid_github.keyring, 'get_password',
                        return_value=None)
     @mock.patch.object(timid_github.keyring, 'set_password')
@@ -817,7 +825,9 @@ class TestGithubExtension(unittest.TestCase):
 
     @mock.patch.object(timid_github.getpass, 'getpass',
                        return_value='from_keyboard')
-    @mock.patch.object(timid_github.github, 'Github')
+    @mock.patch.object(timid_github.github, 'Github', **{
+        'return_value.get_user.return_value.login': 'example',
+    })
     @mock.patch.object(timid_github.keyring, 'get_password',
                        return_value='from_keyring')
     @mock.patch.object(timid_github.keyring, 'set_password')
@@ -893,7 +903,9 @@ class TestGithubExtension(unittest.TestCase):
 
     @mock.patch.object(timid_github.getpass, 'getpass',
                        return_value='from_keyboard')
-    @mock.patch.object(timid_github.github, 'Github')
+    @mock.patch.object(timid_github.github, 'Github', **{
+        'return_value.get_user.return_value.login': 'example',
+    })
     @mock.patch.object(timid_github.keyring, 'get_password',
                        return_value='from_keyring')
     @mock.patch.object(timid_github.keyring, 'set_password')
@@ -940,7 +952,9 @@ class TestGithubExtension(unittest.TestCase):
 
     @mock.patch.object(timid_github.getpass, 'getpass',
                        return_value='from_keyboard')
-    @mock.patch.object(timid_github.github, 'Github')
+    @mock.patch.object(timid_github.github, 'Github', **{
+        'return_value.get_user.return_value.login': 'example',
+    })
     @mock.patch.object(timid_github.keyring, 'get_password',
                        return_value='from_keyring')
     @mock.patch.object(timid_github.keyring, 'set_password')
@@ -987,7 +1001,9 @@ class TestGithubExtension(unittest.TestCase):
 
     @mock.patch.object(timid_github.getpass, 'getpass',
                        return_value='from_keyboard')
-    @mock.patch.object(timid_github.github, 'Github')
+    @mock.patch.object(timid_github.github, 'Github', **{
+        'return_value.get_user.return_value.login': 'example',
+    })
     @mock.patch.object(timid_github.keyring, 'get_password',
                        return_value='from_keyring')
     @mock.patch.object(timid_github.keyring, 'set_password')
@@ -1034,7 +1050,9 @@ class TestGithubExtension(unittest.TestCase):
 
     @mock.patch.object(timid_github.getpass, 'getpass',
                        return_value='from_keyboard')
-    @mock.patch.object(timid_github.github, 'Github')
+    @mock.patch.object(timid_github.github, 'Github', **{
+        'return_value.get_user.return_value.login': 'example',
+    })
     @mock.patch.object(timid_github.keyring, 'get_password',
                        return_value='from_keyring')
     @mock.patch.object(timid_github.keyring, 'set_password')
@@ -1109,7 +1127,9 @@ class TestGithubExtension(unittest.TestCase):
 
     @mock.patch.object(timid_github.getpass, 'getpass',
                        return_value='from_keyboard')
-    @mock.patch.object(timid_github.github, 'Github')
+    @mock.patch.object(timid_github.github, 'Github', **{
+        'return_value.get_user.return_value.login': 'example',
+    })
     @mock.patch.object(timid_github.keyring, 'get_password',
                        return_value='from_keyring')
     @mock.patch.object(timid_github.keyring, 'set_password')
@@ -1185,7 +1205,9 @@ class TestGithubExtension(unittest.TestCase):
 
     @mock.patch.object(timid_github.getpass, 'getpass',
                        return_value='from_keyboard')
-    @mock.patch.object(timid_github.github, 'Github')
+    @mock.patch.object(timid_github.github, 'Github', **{
+        'return_value.get_user.return_value.login': 'example',
+    })
     @mock.patch.object(timid_github.keyring, 'get_password',
                        return_value='from_keyring')
     @mock.patch.object(timid_github.keyring, 'set_password')
@@ -1261,7 +1283,9 @@ class TestGithubExtension(unittest.TestCase):
 
     @mock.patch.object(timid_github.getpass, 'getpass',
                        return_value='from_keyboard')
-    @mock.patch.object(timid_github.github, 'Github')
+    @mock.patch.object(timid_github.github, 'Github', **{
+        'return_value.get_user.return_value.login': 'example',
+    })
     @mock.patch.object(timid_github.keyring, 'get_password',
                        return_value='from_keyring')
     @mock.patch.object(timid_github.keyring, 'set_password')
@@ -1341,7 +1365,9 @@ class TestGithubExtension(unittest.TestCase):
 
     @mock.patch.object(timid_github.getpass, 'getpass',
                        return_value='from_keyboard')
-    @mock.patch.object(timid_github.github, 'Github')
+    @mock.patch.object(timid_github.github, 'Github', **{
+        'return_value.get_user.return_value.login': 'example',
+    })
     @mock.patch.object(timid_github.keyring, 'get_password',
                        return_value='from_keyring')
     @mock.patch.object(timid_github.keyring, 'set_password')
@@ -1422,7 +1448,9 @@ class TestGithubExtension(unittest.TestCase):
 
     @mock.patch.object(timid_github.getpass, 'getpass',
                        return_value='from_keyboard')
-    @mock.patch.object(timid_github.github, 'Github')
+    @mock.patch.object(timid_github.github, 'Github', **{
+        'return_value.get_user.return_value.login': 'example',
+    })
     @mock.patch.object(timid_github.keyring, 'get_password',
                        return_value='from_keyring')
     @mock.patch.object(timid_github.keyring, 'set_password')
@@ -1498,7 +1526,9 @@ class TestGithubExtension(unittest.TestCase):
 
     @mock.patch.object(timid_github.getpass, 'getpass',
                        return_value='from_keyboard')
-    @mock.patch.object(timid_github.github, 'Github')
+    @mock.patch.object(timid_github.github, 'Github', **{
+        'return_value.get_user.return_value.login': 'example',
+    })
     @mock.patch.object(timid_github.keyring, 'get_password',
                        return_value='from_keyring')
     @mock.patch.object(timid_github.keyring, 'set_password')
@@ -1573,7 +1603,9 @@ class TestGithubExtension(unittest.TestCase):
 
     @mock.patch.object(timid_github.getpass, 'getpass',
                        return_value='from_keyboard')
-    @mock.patch.object(timid_github.github, 'Github')
+    @mock.patch.object(timid_github.github, 'Github', **{
+        'return_value.get_user.return_value.login': 'example',
+    })
     @mock.patch.object(timid_github.keyring, 'get_password',
                        return_value='from_keyring')
     @mock.patch.object(timid_github.keyring, 'set_password')
@@ -1648,7 +1680,9 @@ class TestGithubExtension(unittest.TestCase):
 
     @mock.patch.object(timid_github.getpass, 'getpass',
                        return_value='from_keyboard')
-    @mock.patch.object(timid_github.github, 'Github')
+    @mock.patch.object(timid_github.github, 'Github', **{
+        'return_value.get_user.return_value.login': 'example',
+    })
     @mock.patch.object(timid_github.keyring, 'get_password',
                        return_value='from_keyring')
     @mock.patch.object(timid_github.keyring, 'set_password')
@@ -1723,7 +1757,9 @@ class TestGithubExtension(unittest.TestCase):
 
     @mock.patch.object(timid_github.getpass, 'getpass',
                        return_value='from_keyboard')
-    @mock.patch.object(timid_github.github, 'Github')
+    @mock.patch.object(timid_github.github, 'Github', **{
+        'return_value.get_user.return_value.login': 'example',
+    })
     @mock.patch.object(timid_github.keyring, 'get_password',
                        return_value='from_keyring')
     @mock.patch.object(timid_github.keyring, 'set_password')
@@ -1805,7 +1841,9 @@ class TestGithubExtension(unittest.TestCase):
 
     @mock.patch.object(timid_github.getpass, 'getpass',
                        return_value='from_keyboard')
-    @mock.patch.object(timid_github.github, 'Github')
+    @mock.patch.object(timid_github.github, 'Github', **{
+        'return_value.get_user.return_value.login': 'example',
+    })
     @mock.patch.object(timid_github.keyring, 'get_password',
                        return_value='from_keyring')
     @mock.patch.object(timid_github.keyring, 'set_password')

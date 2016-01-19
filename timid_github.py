@@ -527,7 +527,8 @@ class GithubExtension(timid.Extension):
 
             # Interpret the repo
             if '/' not in repo:
-                repo = '%s/%s' % (args.github_user, repo)
+                user = gh.get_user()
+                repo = '%s/%s' % (user.login, repo)
 
             # Look up the pull request
             try:
