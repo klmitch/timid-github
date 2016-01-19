@@ -240,7 +240,7 @@ class CloneAction(timid.Action):
         _git(ctxt, 'fetch', 'origin', self.ghe.repo_branch, ssh_retries=5)
         _git(ctxt, 'checkout', self.ghe.repo_branch)
 
-        return timid.StepResult(status=timid.SUCCESS)
+        return timid.StepResult(state=timid.SUCCESS)
 
 
 class MergeAction(timid.Action):
@@ -305,7 +305,7 @@ class MergeAction(timid.Action):
         _git(ctxt, 'checkout', self.ghe.repo_branch)
         _git(ctxt, 'merge', local_branch)
 
-        return timid.StepResult(status=timid.SUCCESS)
+        return timid.StepResult(state=timid.SUCCESS)
 
 
 # A mapping of URL string to the attribute of the repository object

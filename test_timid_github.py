@@ -408,7 +408,7 @@ class TestCloneAction(unittest.TestCase):
             mock.call('ctxt', 'checkout', 'branch'),
         ])
         self.assertEqual(mock_git.call_count, 7)
-        mock_StepResult.assert_called_once_with(status=timid.SUCCESS)
+        mock_StepResult.assert_called_once_with(state=timid.SUCCESS)
 
 
 class TestMergeAction(unittest.TestCase):
@@ -444,7 +444,7 @@ class TestMergeAction(unittest.TestCase):
             mock.call('ctxt', 'merge', 'user-login-change-branch'),
         ])
         self.assertEqual(mock_git.call_count, 5)
-        mock_StepResult.assert_called_once_with(status=timid.SUCCESS)
+        mock_StepResult.assert_called_once_with(state=timid.SUCCESS)
 
 
 class TestSelectUrl(unittest.TestCase):
