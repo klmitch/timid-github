@@ -30,6 +30,65 @@ class TestException(Exception):
     pass
 
 
+class TestGitException(unittest.TestCase):
+    def test_init(self):
+        obj = timid_github.GitException('test message', 'result')
+
+        self.assertEqual(obj.result, 'result')
+
+
+class TestExcToResult(unittest.TestCase):
+    @mock.patch.object(timid_github.sys, 'exc_info', return_value='exc_info')
+    @mock.patch.object(timid_github.timid, 'StepResult', return_value='result')
+    def test_base(self, mock_StepResult, mock_exc_info):
+        func = mock.Mock(__name__='func', return_value='success')
+
+        decorated = timid_github.exc_to_result(func)
+
+        self.assertFalse(func.called)
+        self.assertFalse(mock_StepResult.called)
+
+        result = decorated(1, 2, 3, a=4, b=5, c=6)
+
+        self.assertEqual(result, 'success')
+        func.assert_called_once_with(1, 2, 3, a=4, b=5, c=6)
+        self.assertFalse(mock_StepResult.called)
+
+    @mock.patch.object(timid_github.sys, 'exc_info', return_value='exc_info')
+    @mock.patch.object(timid_github.timid, 'StepResult', return_value='result')
+    def test_gitexception(self, mock_StepResult, mock_exc_info):
+        exc = timid_github.GitException('message', 'git exception')
+        func = mock.Mock(__name__='func', side_effect=exc)
+
+        decorated = timid_github.exc_to_result(func)
+
+        self.assertFalse(func.called)
+        self.assertFalse(mock_StepResult.called)
+
+        result = decorated(1, 2, 3, a=4, b=5, c=6)
+
+        self.assertEqual(result, 'git exception')
+        func.assert_called_once_with(1, 2, 3, a=4, b=5, c=6)
+        self.assertFalse(mock_StepResult.called)
+
+    @mock.patch.object(timid_github.sys, 'exc_info', return_value='exc_info')
+    @mock.patch.object(timid_github.timid, 'StepResult', return_value='result')
+    def test_other_exception(self, mock_StepResult, mock_exc_info):
+        exc = TestException('some exception')
+        func = mock.Mock(__name__='func', side_effect=exc)
+
+        decorated = timid_github.exc_to_result(func)
+
+        self.assertFalse(func.called)
+        self.assertFalse(mock_StepResult.called)
+
+        result = decorated(1, 2, 3, a=4, b=5, c=6)
+
+        self.assertEqual(result, 'result')
+        func.assert_called_once_with(1, 2, 3, a=4, b=5, c=6)
+        mock_StepResult.assert_called_once_with(exc_info='exc_info')
+
+
 class TestGit(unittest.TestCase):
     def make_child(self, stdout=b'stdout', stderr=b'stderr', returncode=0):
         return mock.Mock(**{
@@ -47,44 +106,100 @@ class TestGit(unittest.TestCase):
             'environment.call.side_effect': children,
         })
 
+    @mock.patch.object(timid_github.timid, 'StepResult')
     @mock.patch.object(timid_github.time, 'sleep')
-    def test_base(self, mock_sleep):
+    def test_base(self, mock_sleep, mock_StepResult):
         ctxt = self.make_ctxt()
 
         result = timid_github._git(ctxt, 'spam', 'arg1', 'arg2')
 
         self.assertEqual(result, b'stdout')
+        ctxt.emit.assert_has_calls([
+            mock.call('Executing command "git spam arg1 arg2"', debug=True),
+            mock.call('Command result: return code 0, stdout %r, stderr %r' %
+                      (b'stdout', b'stderr'), debug=True),
+        ])
+        self.assertEqual(ctxt.emit.call_count, 2)
         ctxt.environment.call.assert_called_once_with(
             ['git', 'spam', 'arg1', 'arg2'], close_fds=True,
             stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         self.assertFalse(mock_sleep.called)
+        self.assertFalse(mock_StepResult.called)
 
+    @mock.patch.object(timid_github.timid, 'StepResult')
     @mock.patch.object(timid_github.time, 'sleep')
-    def test_base_failure(self, mock_sleep):
+    def test_base_failure(self, mock_sleep, mock_StepResult):
         ctxt = self.make_ctxt(returncode=1)
 
-        self.assertRaises(timid_github.GitException,
-                          timid_github._git, ctxt, 'spam', 'arg1', 'arg2')
+        try:
+            result = timid_github._git(ctxt, 'spam', 'arg1', 'arg2')
+        except timid_github.GitException as e:
+            self.assertEqual(e.result, mock_StepResult.return_value)
+        else:
+            self.fail('timid_github.GitException not raised')
+        ctxt.emit.assert_has_calls([
+            mock.call('Executing command "git spam arg1 arg2"', debug=True),
+            mock.call('Command result: return code 1, stdout %r, stderr %r' %
+                      (b'stdout', b'stderr'), debug=True),
+        ])
+        self.assertEqual(ctxt.emit.call_count, 2)
         ctxt.environment.call.assert_called_once_with(
             ['git', 'spam', 'arg1', 'arg2'], close_fds=True,
             stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         self.assertFalse(mock_sleep.called)
+        mock_StepResult.assert_called_once_with(
+            state=timid.ERROR, returncode=1,
+            msg='Git command "git spam arg1 arg2" returned 1: %s' % b'stdout')
 
+    @mock.patch.object(timid_github.timid, 'StepResult')
     @mock.patch.object(timid_github.time, 'sleep')
-    def test_base_failure_noraise(self, mock_sleep):
+    def test_base_failure_noout(self, mock_sleep, mock_StepResult):
+        ctxt = self.make_ctxt(returncode=1, stdout=b'')
+
+        try:
+            result = timid_github._git(ctxt, 'spam', 'arg1', 'arg2')
+        except timid_github.GitException as e:
+            self.assertEqual(e.result, mock_StepResult.return_value)
+        else:
+            self.fail('timid_github.GitException not raised')
+        ctxt.emit.assert_has_calls([
+            mock.call('Executing command "git spam arg1 arg2"', debug=True),
+            mock.call('Command result: return code 1, stdout %r, stderr %r' %
+                      (b'', b'stderr'), debug=True),
+        ])
+        self.assertEqual(ctxt.emit.call_count, 2)
+        ctxt.environment.call.assert_called_once_with(
+            ['git', 'spam', 'arg1', 'arg2'], close_fds=True,
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        self.assertFalse(mock_sleep.called)
+        mock_StepResult.assert_called_once_with(
+            state=timid.ERROR, returncode=1,
+            msg='Git command "git spam arg1 arg2" returned 1')
+
+    @mock.patch.object(timid_github.timid, 'StepResult')
+    @mock.patch.object(timid_github.time, 'sleep')
+    def test_base_failure_noraise(self, mock_sleep, mock_StepResult):
         ctxt = self.make_ctxt(returncode=1)
 
         result = timid_github._git(ctxt, 'spam', 'arg1', 'arg2',
                                    do_raise=False)
 
         self.assertEqual(result, b'stdout')
+        ctxt.emit.assert_has_calls([
+            mock.call('Executing command "git spam arg1 arg2"', debug=True),
+            mock.call('Command result: return code 1, stdout %r, stderr %r' %
+                      (b'stdout', b'stderr'), debug=True),
+        ])
+        self.assertEqual(ctxt.emit.call_count, 2)
         ctxt.environment.call.assert_called_once_with(
             ['git', 'spam', 'arg1', 'arg2'], close_fds=True,
             stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         self.assertFalse(mock_sleep.called)
+        self.assertFalse(mock_StepResult.called)
 
+    @mock.patch.object(timid_github.timid, 'StepResult')
     @mock.patch.object(timid_github.time, 'sleep')
-    def test_retries_base(self, mock_sleep):
+    def test_retries_base(self, mock_sleep, mock_StepResult):
         ctxt = self.make_ctxt(
             self.make_child(stdout=timid_github.SSH_ERROR, returncode=1),
             self.make_child(stderr=timid_github.SSH_ERROR, returncode=1),
@@ -95,6 +210,24 @@ class TestGit(unittest.TestCase):
                                    ssh_retries=5)
 
         self.assertEqual(result, b'final success')
+        ctxt.emit.assert_has_calls([
+            mock.call('Executing command "git spam arg1 arg2"', debug=True),
+            mock.call('Command result: return code 1, stdout %r, stderr %r' %
+                      (timid_github.SSH_ERROR, b'stderr'), debug=True),
+            mock.call('Retrying command after a sleep of 1 seconds',
+                      debug=True),
+            mock.call('Retry 2 of 5: retrying command "git spam arg1 arg2"',
+                      debug=True),
+            mock.call('Command result: return code 1, stdout %r, stderr %r' %
+                      (b'stdout', timid_github.SSH_ERROR), debug=True),
+            mock.call('Retrying command after a sleep of 2 seconds',
+                      debug=True),
+            mock.call('Retry 3 of 5: retrying command "git spam arg1 arg2"',
+                      debug=True),
+            mock.call('Command result: return code 0, stdout %r, stderr %r' %
+                      (b'final success', b'stderr'), debug=True),
+        ])
+        self.assertEqual(ctxt.emit.call_count, 8)
         ctxt.environment.call.assert_has_calls([
             mock.call(['git', 'spam', 'arg1', 'arg2'], close_fds=True,
                       stdout=subprocess.PIPE, stderr=subprocess.PIPE),
@@ -109,18 +242,39 @@ class TestGit(unittest.TestCase):
             mock.call(2),
         ])
         self.assertEqual(mock_sleep.call_count, 2)
+        self.assertFalse(mock_StepResult.called)
 
+    @mock.patch.object(timid_github.timid, 'StepResult')
     @mock.patch.object(timid_github.time, 'sleep')
-    def test_retries_too_many(self, mock_sleep):
+    def test_retries_too_many(self, mock_sleep, mock_StepResult):
         ctxt = self.make_ctxt(
             self.make_child(stdout=timid_github.SSH_ERROR, returncode=1),
             self.make_child(stderr=timid_github.SSH_ERROR, returncode=1),
             self.make_child(stdout=b'final success'),
         )
 
-        self.assertRaises(timid_github.GitException,
-                          timid_github._git, ctxt, 'spam', 'arg1', 'arg2',
-                          ssh_retries=2)
+        try:
+            result = timid_github._git(ctxt, 'spam', 'arg1', 'arg2',
+                                       ssh_retries=2)
+        except timid_github.GitException as e:
+            self.assertEqual(e.result, mock_StepResult.return_value)
+        else:
+            self.fail('timid_github.GitException not raised')
+        ctxt.emit.assert_has_calls([
+            mock.call('Executing command "git spam arg1 arg2"', debug=True),
+            mock.call('Command result: return code 1, stdout %r, stderr %r' %
+                      (timid_github.SSH_ERROR, b'stderr'), debug=True),
+            mock.call('Retrying command after a sleep of 1 seconds',
+                      debug=True),
+            mock.call('Retry 2 of 2: retrying command "git spam arg1 arg2"',
+                      debug=True),
+            mock.call('Command result: return code 1, stdout %r, stderr %r' %
+                      (b'stdout', timid_github.SSH_ERROR), debug=True),
+            mock.call('Retrying command after a sleep of 2 seconds',
+                      debug=True),
+            mock.call('Too many tries, exiting instead', debug=True),
+        ])
+        self.assertEqual(ctxt.emit.call_count, 7)
         ctxt.environment.call.assert_has_calls([
             mock.call(['git', 'spam', 'arg1', 'arg2'], close_fds=True,
                       stdout=subprocess.PIPE, stderr=subprocess.PIPE),
@@ -129,9 +283,13 @@ class TestGit(unittest.TestCase):
         ])
         self.assertEqual(ctxt.environment.call.call_count, 2)
         mock_sleep.assert_called_once_with(1)
+        mock_StepResult.assert_called_once_with(
+            state=timid.ERROR, returncode=1,
+            msg='Git command "git spam arg1 arg2" returned 1: %s' % b'stdout')
 
+    @mock.patch.object(timid_github.timid, 'StepResult')
     @mock.patch.object(timid_github.time, 'sleep')
-    def test_retries_exponential_sleep(self, mock_sleep):
+    def test_retries_exponential_sleep(self, mock_sleep, mock_StepResult):
         ctxt = self.make_ctxt(
             self.make_child(stdout=timid_github.SSH_ERROR, returncode=1),
             self.make_child(stderr=timid_github.SSH_ERROR, returncode=1),
@@ -144,6 +302,36 @@ class TestGit(unittest.TestCase):
                                    ssh_retries=5)
 
         self.assertEqual(result, b'final success')
+        ctxt.emit.assert_has_calls([
+            mock.call('Executing command "git spam arg1 arg2"', debug=True),
+            mock.call('Command result: return code 1, stdout %r, stderr %r' %
+                      (timid_github.SSH_ERROR, b'stderr'), debug=True),
+            mock.call('Retrying command after a sleep of 1 seconds',
+                      debug=True),
+            mock.call('Retry 2 of 5: retrying command "git spam arg1 arg2"',
+                      debug=True),
+            mock.call('Command result: return code 1, stdout %r, stderr %r' %
+                      (b'stdout', timid_github.SSH_ERROR), debug=True),
+            mock.call('Retrying command after a sleep of 2 seconds',
+                      debug=True),
+            mock.call('Retry 3 of 5: retrying command "git spam arg1 arg2"',
+                      debug=True),
+            mock.call('Command result: return code 1, stdout %r, stderr %r' %
+                      (timid_github.SSH_ERROR, b'stderr'), debug=True),
+            mock.call('Retrying command after a sleep of 4 seconds',
+                      debug=True),
+            mock.call('Retry 4 of 5: retrying command "git spam arg1 arg2"',
+                      debug=True),
+            mock.call('Command result: return code 1, stdout %r, stderr %r' %
+                      (b'stdout', timid_github.SSH_ERROR), debug=True),
+            mock.call('Retrying command after a sleep of 8 seconds',
+                      debug=True),
+            mock.call('Retry 5 of 5: retrying command "git spam arg1 arg2"',
+                      debug=True),
+            mock.call('Command result: return code 0, stdout %r, stderr %r' %
+                      (b'final success', b'stderr'), debug=True),
+        ])
+        self.assertEqual(ctxt.emit.call_count, 14)
         ctxt.environment.call.assert_has_calls([
             mock.call(['git', 'spam', 'arg1', 'arg2'], close_fds=True,
                       stdout=subprocess.PIPE, stderr=subprocess.PIPE),
@@ -164,6 +352,7 @@ class TestGit(unittest.TestCase):
             mock.call(8),
         ])
         self.assertEqual(mock_sleep.call_count, 4)
+        self.assertFalse(mock_StepResult.called)
 
 
 class TestCloneAction(unittest.TestCase):
@@ -175,6 +364,8 @@ class TestCloneAction(unittest.TestCase):
         self.assertEqual(result.ghe, 'ghe')
         mock_init.assert_called_once_with('ctxt', '__clone__', None, None)
 
+    @mock.patch.object(timid_github.timid, 'StepResult')
+    @mock.patch.object(timid_github.sys, 'exc_info', return_value='exc_info')
     @mock.patch.object(timid_github.os, 'lstat',
                        side_effect=OSError(errno.ENOENT, 'no file'))
     @mock.patch.object(timid_github.os, 'remove')
@@ -186,7 +377,8 @@ class TestCloneAction(unittest.TestCase):
     @mock.patch.object(timid_github.CloneAction, '_update',
                        return_value='update success')
     def test_call_base(self, mock_update, mock_clone, mock_S_ISDIR,
-                       mock_rmtree, mock_isdir, mock_remove, mock_lstat):
+                       mock_rmtree, mock_isdir, mock_remove, mock_lstat,
+                       mock_exc_info, mock_StepResult):
         ghe = mock.Mock(repo_name='repo')
         ctxt = mock.Mock(**{
             'environment.cwd': '/work/dir',
@@ -198,13 +390,18 @@ class TestCloneAction(unittest.TestCase):
         self.assertEqual(result, 'clone success')
         self.assertEqual(ctxt.environment.cwd, '/work/dir')
         mock_lstat.assert_called_once_with('/work/dir/repo')
+        self.assertFalse(mock_exc_info.called)
+        self.assertFalse(mock_StepResult.called)
         self.assertFalse(mock_S_ISDIR.called)
         self.assertFalse(mock_remove.called)
         self.assertFalse(mock_isdir.called)
         self.assertFalse(mock_rmtree.called)
         mock_clone.assert_called_once_with('/work/dir', '/work/dir/repo', ctxt)
         self.assertFalse(mock_update.called)
+        self.assertFalse(ctxt.emit.called)
 
+    @mock.patch.object(timid_github.timid, 'StepResult')
+    @mock.patch.object(timid_github.sys, 'exc_info', return_value='exc_info')
     @mock.patch.object(timid_github.os, 'lstat',
                        side_effect=OSError(errno.EAGAIN, 'again'))
     @mock.patch.object(timid_github.os, 'remove')
@@ -216,23 +413,33 @@ class TestCloneAction(unittest.TestCase):
     @mock.patch.object(timid_github.CloneAction, '_update',
                        return_value='update success')
     def test_call_error(self, mock_update, mock_clone, mock_S_ISDIR,
-                        mock_rmtree, mock_isdir, mock_remove, mock_lstat):
+                        mock_rmtree, mock_isdir, mock_remove, mock_lstat,
+                        mock_exc_info, mock_StepResult):
         ghe = mock.Mock(repo_name='repo')
         ctxt = mock.Mock(**{
             'environment.cwd': '/work/dir',
         })
         obj = timid_github.CloneAction(ctxt, ghe)
 
-        self.assertRaises(OSError, obj, ctxt)
+        result = obj(ctxt)
+
+        self.assertEqual(result, mock_StepResult.return_value)
         self.assertEqual(ctxt.environment.cwd, '/work/dir')
         mock_lstat.assert_called_once_with('/work/dir/repo')
+        mock_exc_info.assert_called_once_with()
+        mock_StepResult.assert_called_once_with(
+            msg='Unable to stat repo directory /work/dir/repo',
+            exc_info='exc_info')
         self.assertFalse(mock_S_ISDIR.called)
         self.assertFalse(mock_remove.called)
         self.assertFalse(mock_isdir.called)
         self.assertFalse(mock_rmtree.called)
         self.assertFalse(mock_clone.called)
         self.assertFalse(mock_update.called)
+        self.assertFalse(ctxt.emit.called)
 
+    @mock.patch.object(timid_github.timid, 'StepResult')
+    @mock.patch.object(timid_github.sys, 'exc_info', return_value='exc_info')
     @mock.patch.object(timid_github.os, 'lstat',
                        return_value=mock.Mock(st_mode='mode'))
     @mock.patch.object(timid_github.os, 'remove')
@@ -244,7 +451,8 @@ class TestCloneAction(unittest.TestCase):
     @mock.patch.object(timid_github.CloneAction, '_update',
                        return_value='update success')
     def test_call_non_dir(self, mock_update, mock_clone, mock_S_ISDIR,
-                          mock_rmtree, mock_isdir, mock_remove, mock_lstat):
+                          mock_rmtree, mock_isdir, mock_remove, mock_lstat,
+                          mock_exc_info, mock_StepResult):
         ghe = mock.Mock(repo_name='repo')
         ctxt = mock.Mock(**{
             'environment.cwd': '/work/dir',
@@ -256,13 +464,20 @@ class TestCloneAction(unittest.TestCase):
         self.assertEqual(result, 'clone success')
         self.assertEqual(ctxt.environment.cwd, '/work/dir')
         mock_lstat.assert_called_once_with('/work/dir/repo')
+        self.assertFalse(mock_exc_info.called)
+        self.assertFalse(mock_StepResult.called)
         mock_S_ISDIR.assert_called_once_with('mode')
         mock_remove.assert_called_once_with('/work/dir/repo')
         self.assertFalse(mock_isdir.called)
         self.assertFalse(mock_rmtree.called)
         mock_clone.assert_called_once_with('/work/dir', '/work/dir/repo', ctxt)
         self.assertFalse(mock_update.called)
+        ctxt.emit.assert_called_once_with(
+            'Deleting file shadowing repository directory /work/dir/repo',
+            level=2)
 
+    @mock.patch.object(timid_github.timid, 'StepResult')
+    @mock.patch.object(timid_github.sys, 'exc_info', return_value='exc_info')
     @mock.patch.object(timid_github.os, 'lstat',
                        return_value=mock.Mock(st_mode='mode'))
     @mock.patch.object(timid_github.os, 'remove')
@@ -274,7 +489,8 @@ class TestCloneAction(unittest.TestCase):
     @mock.patch.object(timid_github.CloneAction, '_update',
                        return_value='update success')
     def test_call_git_dir(self, mock_update, mock_clone, mock_S_ISDIR,
-                          mock_rmtree, mock_isdir, mock_remove, mock_lstat):
+                          mock_rmtree, mock_isdir, mock_remove, mock_lstat,
+                          mock_exc_info, mock_StepResult):
         ghe = mock.Mock(repo_name='repo')
         ctxt = mock.Mock(**{
             'environment.cwd': '/work/dir',
@@ -286,13 +502,18 @@ class TestCloneAction(unittest.TestCase):
         self.assertEqual(result, 'update success')
         self.assertEqual(ctxt.environment.cwd, '/work/dir/repo')
         mock_lstat.assert_called_once_with('/work/dir/repo')
+        self.assertFalse(mock_exc_info.called)
+        self.assertFalse(mock_StepResult.called)
         mock_S_ISDIR.assert_called_once_with('mode')
         self.assertFalse(mock_remove.called)
         mock_isdir.assert_called_once_with('/work/dir/repo/.git')
         self.assertFalse(mock_rmtree.called)
         self.assertFalse(mock_clone.called)
         mock_update.assert_called_once_with(ctxt)
+        self.assertFalse(ctxt.emit.called)
 
+    @mock.patch.object(timid_github.timid, 'StepResult')
+    @mock.patch.object(timid_github.sys, 'exc_info', return_value='exc_info')
     @mock.patch.object(timid_github.os, 'lstat',
                        return_value=mock.Mock(st_mode='mode'))
     @mock.patch.object(timid_github.os, 'remove')
@@ -304,7 +525,8 @@ class TestCloneAction(unittest.TestCase):
     @mock.patch.object(timid_github.CloneAction, '_update',
                        return_value='update success')
     def test_call_nongit_dir(self, mock_update, mock_clone, mock_S_ISDIR,
-                             mock_rmtree, mock_isdir, mock_remove, mock_lstat):
+                             mock_rmtree, mock_isdir, mock_remove, mock_lstat,
+                             mock_exc_info, mock_StepResult):
         ghe = mock.Mock(repo_name='repo')
         ctxt = mock.Mock(**{
             'environment.cwd': '/work/dir',
@@ -316,13 +538,20 @@ class TestCloneAction(unittest.TestCase):
         self.assertEqual(result, 'clone success')
         self.assertEqual(ctxt.environment.cwd, '/work/dir')
         mock_lstat.assert_called_once_with('/work/dir/repo')
+        self.assertFalse(mock_exc_info.called)
+        self.assertFalse(mock_StepResult.called)
         mock_S_ISDIR.assert_called_once_with('mode')
         self.assertFalse(mock_remove.called)
         mock_isdir.assert_called_once_with('/work/dir/repo/.git')
         mock_rmtree.assert_called_once_with('/work/dir/repo')
         mock_clone.assert_called_once_with('/work/dir', '/work/dir/repo', ctxt)
         self.assertFalse(mock_update.called)
+        ctxt.emit.assert_called_once_with(
+            'Deleting directory tree shadowing repository directory '
+            '/work/dir/repo', level=2)
 
+    @mock.patch.object(timid_github.timid, 'StepResult')
+    @mock.patch.object(timid_github.sys, 'exc_info', return_value='exc_info')
     @mock.patch.object(timid_github.os, 'lstat',
                        return_value=mock.Mock(st_mode='mode'))
     @mock.patch.object(timid_github.os, 'remove')
@@ -335,7 +564,8 @@ class TestCloneAction(unittest.TestCase):
                        side_effect=TestException('bah'))
     def test_call_git_dir_failed_update(self, mock_update, mock_clone,
                                         mock_S_ISDIR, mock_rmtree, mock_isdir,
-                                        mock_remove, mock_lstat):
+                                        mock_remove, mock_lstat,
+                                        mock_exc_info, mock_StepResult):
         ghe = mock.Mock(repo_name='repo')
         ctxt = mock.Mock(**{
             'environment.cwd': '/work/dir',
@@ -347,12 +577,21 @@ class TestCloneAction(unittest.TestCase):
         self.assertEqual(result, 'clone success')
         self.assertEqual(ctxt.environment.cwd, '/work/dir')
         mock_lstat.assert_called_once_with('/work/dir/repo')
+        self.assertFalse(mock_exc_info.called)
+        self.assertFalse(mock_StepResult.called)
         mock_S_ISDIR.assert_called_once_with('mode')
         self.assertFalse(mock_remove.called)
         mock_isdir.assert_called_once_with('/work/dir/repo/.git')
         mock_rmtree.assert_called_once_with('/work/dir/repo')
         mock_clone.assert_called_once_with('/work/dir', '/work/dir/repo', ctxt)
         mock_update.assert_called_once_with(ctxt)
+        ctxt.emit.assert_has_calls([
+            mock.call('Failed to update existing repository in directory '
+                      '/work/dir/repo; starting from scratch'),
+            mock.call('Deleting directory tree shadowing repository '
+                      'directory /work/dir/repo', level=2),
+        ])
+        self.assertEqual(ctxt.emit.call_count, 2)
 
     @mock.patch.object(timid_github, '_git')
     @mock.patch.object(timid_github.CloneAction, '_update',
@@ -371,6 +610,8 @@ class TestCloneAction(unittest.TestCase):
         mock_git.assert_called_once_with(
             ctxt, 'clone', 'repo://url', '/work/dir/repo', ssh_retries=5)
         mock_update.assert_called_once_with(ctxt)
+        ctxt.emit.assert_called_once_with(
+            'Cloning repository from repo://url into directory /work/dir/repo')
 
     @mock.patch.object(timid_github, '_git')
     @mock.patch.object(timid_github.CloneAction, '_update',
@@ -388,27 +629,37 @@ class TestCloneAction(unittest.TestCase):
         mock_git.assert_called_once_with(
             ctxt, 'clone', 'repo://url', '/work/dir/repo', ssh_retries=5)
         mock_update.assert_called_once_with(ctxt)
+        ctxt.emit.assert_called_once_with(
+            'Cloning repository from repo://url into directory /work/dir/repo')
 
     @mock.patch.object(timid_github, '_git')
     @mock.patch.object(timid_github.timid, 'StepResult', return_value='result')
     def test_update(self, mock_StepResult, mock_git):
         ghe = mock.Mock(repo_url='repo://url', repo_branch='branch')
-        obj = timid_github.CloneAction('ctxt', ghe)
+        ctxt = mock.Mock()
+        obj = timid_github.CloneAction(ctxt, ghe)
 
-        result = obj._update('ctxt')
+        result = obj._update(ctxt)
 
         self.assertEqual(result, 'result')
         mock_git.assert_has_calls([
-            mock.call('ctxt', 'remote', 'set-url', 'origin', 'repo://url'),
-            mock.call('ctxt', 'rebase', '--abort', do_raise=False),
-            mock.call('ctxt', 'checkout', '-f', 'branch'),
-            mock.call('ctxt', 'reset', '--hard', 'origin/branch'),
-            mock.call('ctxt', 'clean', '-fdx'),
-            mock.call('ctxt', 'fetch', 'origin', 'branch', ssh_retries=5),
-            mock.call('ctxt', 'checkout', 'branch'),
+            mock.call(ctxt, 'remote', 'set-url', 'origin', 'repo://url'),
+            mock.call(ctxt, 'rebase', '--abort', do_raise=False),
+            mock.call(ctxt, 'checkout', '-f', 'branch'),
+            mock.call(ctxt, 'reset', '--hard', 'origin/branch'),
+            mock.call(ctxt, 'clean', '-fdx'),
+            mock.call(ctxt, 'fetch', 'origin', 'branch', ssh_retries=5),
+            mock.call(ctxt, 'checkout', 'branch'),
         ])
         self.assertEqual(mock_git.call_count, 7)
         mock_StepResult.assert_called_once_with(state=timid.SUCCESS)
+        ctxt.emit.assert_has_calls([
+            mock.call('Updating repository from upstream data'),
+            mock.call('Cleaning up repository...', level=2),
+            mock.call('Checking out most recent version of branch branch',
+                      level=2),
+        ])
+        self.assertEqual(ctxt.emit.call_count, 3)
 
 
 class TestMergeAction(unittest.TestCase):
@@ -429,22 +680,30 @@ class TestMergeAction(unittest.TestCase):
             'change_url': 'https://change/repo',
             'change_branch': 'change-branch',
         })
-        obj = timid_github.MergeAction('ctxt', ghe)
+        ctxt = mock.Mock()
+        obj = timid_github.MergeAction(ctxt, ghe)
 
-        result = obj('ctxt')
+        result = obj(ctxt)
 
         self.assertEqual(result, 'result')
         mock_git.assert_has_calls([
-            mock.call('ctxt', 'branch', '-D', 'user-login-change-branch',
+            mock.call(ctxt, 'branch', '-D', 'user-login-change-branch',
                       do_raise=False),
-            mock.call('ctxt', 'checkout', '-b', 'user-login-change-branch',
+            mock.call(ctxt, 'checkout', '-b', 'user-login-change-branch',
                       'repo-branch'),
-            mock.call('ctxt', 'pull', 'https://change/repo', 'change-branch'),
-            mock.call('ctxt', 'checkout', 'repo-branch'),
-            mock.call('ctxt', 'merge', 'user-login-change-branch'),
+            mock.call(ctxt, 'pull', 'https://change/repo', 'change-branch'),
+            mock.call(ctxt, 'checkout', 'repo-branch'),
+            mock.call(ctxt, 'merge', 'user-login-change-branch'),
         ])
         self.assertEqual(mock_git.call_count, 5)
         mock_StepResult.assert_called_once_with(state=timid.SUCCESS)
+        ctxt.emit.assert_has_calls([
+            mock.call('Cloning pull request from user-login branch '
+                      'change-branch into local branch '
+                      'user-login-change-branch'),
+            mock.call('Merging the change into branch repo-branch'),
+        ])
+        self.assertEqual(ctxt.emit.call_count, 2)
 
 
 class TestSelectUrl(unittest.TestCase):
@@ -625,6 +884,13 @@ class TestGithubExtension(unittest.TestCase):
                 'url': None,
             }, 'repo', 'repo-url', 'branch',
             'change-repo-url', 'change-branch')
+        ctxt.emit.assert_has_calls([
+            mock.call('Github plugin activated'),
+            mock.call('Testing pull request some/repo#5'),
+            mock.call('Base repository repo-url', level=2),
+            mock.call('PR repository change-repo-url', level=2),
+        ])
+        self.assertEqual(ctxt.emit.call_count, 4)
 
     @mock.patch.object(timid_github.getpass, 'getpass',
                        return_value='from_keyboard')
@@ -668,6 +934,7 @@ class TestGithubExtension(unittest.TestCase):
         self.assertFalse(mock_select_url.called)
         self.assertEqual(len(ctxt.variables.method_calls), 0)
         self.assertFalse(mock_init.called)
+        self.assertFalse(ctxt.emit.called)
 
     @mock.patch.object(timid_github.getpass, 'getpass',
                        return_value='from_keyboard')
@@ -744,6 +1011,13 @@ class TestGithubExtension(unittest.TestCase):
                 'url': None,
             }, 'repo', 'repo-url', 'branch',
             'change-repo-url', 'change-branch')
+        ctxt.emit.assert_has_calls([
+            mock.call('Github plugin activated'),
+            mock.call('Testing pull request some/repo#5'),
+            mock.call('Base repository repo-url', level=2),
+            mock.call('PR repository change-repo-url', level=2),
+        ])
+        self.assertEqual(ctxt.emit.call_count, 4)
 
     @mock.patch.object(timid_github.getpass, 'getpass',
                        return_value='from_keyboard')
@@ -822,6 +1096,13 @@ class TestGithubExtension(unittest.TestCase):
                 'url': None,
             }, 'repo', 'repo-url', 'branch',
             'change-repo-url', 'change-branch')
+        ctxt.emit.assert_has_calls([
+            mock.call('Github plugin activated'),
+            mock.call('Testing pull request some/repo#5'),
+            mock.call('Base repository repo-url', level=2),
+            mock.call('PR repository change-repo-url', level=2),
+        ])
+        self.assertEqual(ctxt.emit.call_count, 4)
 
     @mock.patch.object(timid_github.getpass, 'getpass',
                        return_value='from_keyboard')
@@ -900,6 +1181,14 @@ class TestGithubExtension(unittest.TestCase):
                 'url': None,
             }, 'repo', 'repo-url', 'branch',
             'change-repo-url', 'change-branch')
+        ctxt.emit.assert_has_calls([
+            mock.call('Github plugin activated'),
+            mock.call('Saving password in keyring as requested'),
+            mock.call('Testing pull request some/repo#5'),
+            mock.call('Base repository repo-url', level=2),
+            mock.call('PR repository change-repo-url', level=2),
+        ])
+        self.assertEqual(ctxt.emit.call_count, 5)
 
     @mock.patch.object(timid_github.getpass, 'getpass',
                        return_value='from_keyboard')
@@ -949,6 +1238,11 @@ class TestGithubExtension(unittest.TestCase):
         self.assertFalse(mock_select_url.called)
         self.assertEqual(len(ctxt.variables.method_calls), 0)
         self.assertFalse(mock_init.called)
+        ctxt.emit.assert_has_calls([
+            mock.call('Github plugin activated'),
+            mock.call('Invalid pull request number ""', level=0),
+        ])
+        self.assertEqual(ctxt.emit.call_count, 2)
 
     @mock.patch.object(timid_github.getpass, 'getpass',
                        return_value='from_keyboard')
@@ -998,6 +1292,11 @@ class TestGithubExtension(unittest.TestCase):
         self.assertFalse(mock_select_url.called)
         self.assertEqual(len(ctxt.variables.method_calls), 0)
         self.assertFalse(mock_init.called)
+        ctxt.emit.assert_has_calls([
+            mock.call('Github plugin activated'),
+            mock.call('Invalid pull request number "x"', level=0),
+        ])
+        self.assertEqual(ctxt.emit.call_count, 2)
 
     @mock.patch.object(timid_github.getpass, 'getpass',
                        return_value='from_keyboard')
@@ -1047,6 +1346,11 @@ class TestGithubExtension(unittest.TestCase):
         self.assertFalse(mock_select_url.called)
         self.assertEqual(len(ctxt.variables.method_calls), 0)
         self.assertFalse(mock_init.called)
+        ctxt.emit.assert_has_calls([
+            mock.call('Github plugin activated'),
+            mock.call('Unable to resolve pull request "some/repo#5"', level=0),
+        ])
+        self.assertEqual(ctxt.emit.call_count, 2)
 
     @mock.patch.object(timid_github.getpass, 'getpass',
                        return_value='from_keyboard')
@@ -1124,6 +1428,13 @@ class TestGithubExtension(unittest.TestCase):
                 'url': None,
             }, 'repo', 'repo-url', 'branch',
             'change-repo-url', 'change-branch')
+        ctxt.emit.assert_has_calls([
+            mock.call('Github plugin activated'),
+            mock.call('Testing pull request some/repo#5'),
+            mock.call('Base repository repo-url', level=2),
+            mock.call('PR repository change-repo-url', level=2),
+        ])
+        self.assertEqual(ctxt.emit.call_count, 4)
 
     @mock.patch.object(timid_github.getpass, 'getpass',
                        return_value='from_keyboard')
@@ -1202,6 +1513,13 @@ class TestGithubExtension(unittest.TestCase):
                 'url': None,
             }, 'repo', 'repo-url', 'branch',
             'change-repo-url', 'change-branch')
+        ctxt.emit.assert_has_calls([
+            mock.call('Github plugin activated'),
+            mock.call('Testing pull request some/repo#5'),
+            mock.call('Base repository repo-url', level=2),
+            mock.call('PR repository change-repo-url', level=2),
+        ])
+        self.assertEqual(ctxt.emit.call_count, 4)
 
     @mock.patch.object(timid_github.getpass, 'getpass',
                        return_value='from_keyboard')
@@ -1280,6 +1598,13 @@ class TestGithubExtension(unittest.TestCase):
                 'url': None,
             }, 'repo', 'repo-url', 'branch',
             'change-repo-url', 'change-branch')
+        ctxt.emit.assert_has_calls([
+            mock.call('Github plugin activated'),
+            mock.call('Testing pull request some/repo#5'),
+            mock.call('Base repository repo-url', level=2),
+            mock.call('PR repository change-repo-url', level=2),
+        ])
+        self.assertEqual(ctxt.emit.call_count, 4)
 
     @mock.patch.object(timid_github.getpass, 'getpass',
                        return_value='from_keyboard')
@@ -1362,6 +1687,13 @@ class TestGithubExtension(unittest.TestCase):
                 'url': 'some url',
             }, 'repo', 'repo-url', 'branch',
             'change-repo-url', 'change-branch')
+        ctxt.emit.assert_has_calls([
+            mock.call('Github plugin activated'),
+            mock.call('Testing pull request some/repo#5'),
+            mock.call('Base repository repo-url', level=2),
+            mock.call('PR repository change-repo-url', level=2),
+        ])
+        self.assertEqual(ctxt.emit.call_count, 4)
 
     @mock.patch.object(timid_github.getpass, 'getpass',
                        return_value='from_keyboard')
@@ -1445,6 +1777,13 @@ class TestGithubExtension(unittest.TestCase):
                 'url': 'some url',
             }, 'repo', 'repo-url', 'branch',
             'change-repo-url', 'change-branch')
+        ctxt.emit.assert_has_calls([
+            mock.call('Github plugin activated'),
+            mock.call('Testing pull request some/repo#5'),
+            mock.call('Base repository repo-url', level=2),
+            mock.call('PR repository change-repo-url', level=2),
+        ])
+        self.assertEqual(ctxt.emit.call_count, 4)
 
     @mock.patch.object(timid_github.getpass, 'getpass',
                        return_value='from_keyboard')
@@ -1523,6 +1862,13 @@ class TestGithubExtension(unittest.TestCase):
                 'url': None,
             }, 'repo', 'repo-url', 'branch',
             'change-repo-url', 'change-branch')
+        ctxt.emit.assert_has_calls([
+            mock.call('Github plugin activated'),
+            mock.call('Testing pull request some/repo#5'),
+            mock.call('Base repository repo-url', level=2),
+            mock.call('PR repository change-repo-url', level=2),
+        ])
+        self.assertEqual(ctxt.emit.call_count, 4)
 
     @mock.patch.object(timid_github.getpass, 'getpass',
                        return_value='from_keyboard')
@@ -1600,6 +1946,13 @@ class TestGithubExtension(unittest.TestCase):
                 'url': None,
             }, 'repo', 'repo-url', 'branch',
             'change-repo-url', 'change-branch')
+        ctxt.emit.assert_has_calls([
+            mock.call('Github plugin activated'),
+            mock.call('Testing pull request some/repo#5'),
+            mock.call('Base repository repo-url', level=2),
+            mock.call('PR repository change-repo-url', level=2),
+        ])
+        self.assertEqual(ctxt.emit.call_count, 4)
 
     @mock.patch.object(timid_github.getpass, 'getpass',
                        return_value='from_keyboard')
@@ -1677,6 +2030,13 @@ class TestGithubExtension(unittest.TestCase):
                 'url': None,
             }, 'repo', 'repo-url', 'branch',
             'change-repo-url', 'change-branch')
+        ctxt.emit.assert_has_calls([
+            mock.call('Github plugin activated'),
+            mock.call('Testing pull request some/repo#5'),
+            mock.call('Base repository repo-url', level=2),
+            mock.call('PR repository change-repo-url', level=2),
+        ])
+        self.assertEqual(ctxt.emit.call_count, 4)
 
     @mock.patch.object(timid_github.getpass, 'getpass',
                        return_value='from_keyboard')
@@ -1754,6 +2114,13 @@ class TestGithubExtension(unittest.TestCase):
                 'url': 'url',
             }, 'repo', 'repo-url', 'branch',
             'change-repo-url', 'change-branch')
+        ctxt.emit.assert_has_calls([
+            mock.call('Github plugin activated'),
+            mock.call('Testing pull request some/repo#5'),
+            mock.call('Base repository repo-url', level=2),
+            mock.call('PR repository change-repo-url', level=2),
+        ])
+        self.assertEqual(ctxt.emit.call_count, 4)
 
     @mock.patch.object(timid_github.getpass, 'getpass',
                        return_value='from_keyboard')
@@ -1838,6 +2205,13 @@ class TestGithubExtension(unittest.TestCase):
                 'url': 'url',
             }, 'repo', 'repo-url', 'branch',
             'change-repo-url', 'change-branch')
+        ctxt.emit.assert_has_calls([
+            mock.call('Github plugin activated'),
+            mock.call('Testing pull request some/repo#5'),
+            mock.call('Base repository repo-url', level=2),
+            mock.call('PR repository change-repo-url', level=2),
+        ])
+        self.assertEqual(ctxt.emit.call_count, 4)
 
     @mock.patch.object(timid_github.getpass, 'getpass',
                        return_value='from_keyboard')
@@ -1915,6 +2289,13 @@ class TestGithubExtension(unittest.TestCase):
                 'url': 'https://status.example.com/',
             }, 'repo', 'repo-url', 'branch',
             'change-repo-url', 'change-branch')
+        ctxt.emit.assert_has_calls([
+            mock.call('Github plugin activated'),
+            mock.call('Testing pull request some/repo#5'),
+            mock.call('Base repository repo-url', level=2),
+            mock.call('PR repository change-repo-url', level=2),
+        ])
+        self.assertEqual(ctxt.emit.call_count, 4)
 
     def test_init(self):
         result = timid_github.GithubExtension(
@@ -1936,12 +2317,13 @@ class TestGithubExtension(unittest.TestCase):
 
     def test_set_status_base(self):
         last_commit = mock.Mock()
+        ctxt = mock.Mock()
         obj = timid_github.GithubExtension(
             'gh', 'pull', last_commit, 'status_url', 'final_status',
             'repo_name', 'repo_url', 'repo_branch',
             'change_url', 'change_branch')
 
-        obj._set_status('pending')
+        obj._set_status(ctxt, 'pending')
 
         self.assertEqual(obj.last_status, {
             'status': 'pending',
@@ -1951,15 +2333,19 @@ class TestGithubExtension(unittest.TestCase):
         last_commit.create_status.assert_called_once_with(
             'pending', github.GithubObject.NotSet,
             github.GithubObject.NotSet)
+        ctxt.emit.assert_called_once_with(
+            'Changing status to "pending" (text "None")',
+            debug=True)
 
     def test_set_status_alt(self):
         last_commit = mock.Mock()
+        ctxt = mock.Mock()
         obj = timid_github.GithubExtension(
             'gh', 'pull', last_commit, 'status_url', 'final_status',
             'repo_name', 'repo_url', 'repo_branch',
             'change_url', 'change_branch')
 
-        obj._set_status('pending', 'text', 'url')
+        obj._set_status(ctxt, 'pending', 'text', 'url')
 
         self.assertEqual(obj.last_status, {
             'status': 'pending',
@@ -1968,6 +2354,9 @@ class TestGithubExtension(unittest.TestCase):
         })
         last_commit.create_status.assert_called_once_with(
             'pending', 'url', 'text')
+        ctxt.emit.assert_called_once_with(
+            'Changing status to "pending" (text "text", url url)',
+            debug=True)
 
     @mock.patch.object(timid_github, 'CloneAction', return_value='clone')
     @mock.patch.object(timid_github, 'MergeAction', return_value='merge')
@@ -1979,20 +2368,23 @@ class TestGithubExtension(unittest.TestCase):
     def test_read_steps(self, mock_StepAddress, mock_Step, mock_MergeAction,
                         mock_CloneAction):
         fname = inspect.getsourcefile(timid_github.GithubExtension)
+        ctxt = mock.Mock()
         obj = timid_github.GithubExtension(
             'gh', 'pull', 'last_commit', 'status_url', 'final_status',
             'repo_name', 'repo_url', 'repo_branch',
             'change_url', 'change_branch')
         steps = ['step0', 'step1', 'step2']
 
-        obj.read_steps('ctxt', steps)
+        obj.read_steps(ctxt, steps)
 
         self.assertEqual(steps, [
             '%s:0#clone' % fname, '%s:1#merge' % fname,
             'step0', 'step1', 'step2',
         ])
-        mock_CloneAction.assert_called_once_with('ctxt', obj)
-        mock_MergeAction.assert_called_once_with('ctxt', obj)
+        ctxt.emit.assert_called_once_with(
+            'Prepending clone and merge steps', debug=True)
+        mock_CloneAction.assert_called_once_with(ctxt, obj)
+        mock_MergeAction.assert_called_once_with(ctxt, obj)
         mock_StepAddress.assert_has_calls([
             mock.call(fname, 0),
             mock.call(fname, 1),
@@ -2019,7 +2411,7 @@ class TestGithubExtension(unittest.TestCase):
 
         self.assertEqual(result, None)
         mock_set_status.assert_called_once_with(
-            'pending', 'Step', 'status_url')
+            'ctxt', 'pending', 'Step', 'status_url')
 
     @mock.patch.object(timid_github.GithubExtension, '_set_status')
     def test_post_step_skipped(self, mock_set_status):
@@ -2062,7 +2454,7 @@ class TestGithubExtension(unittest.TestCase):
         obj.post_step('ctxt', step, 5, result)
 
         mock_set_status.assert_called_once_with(
-            'failure', 'Failed: Step', 'status_url')
+            'ctxt', 'failure', 'Failed: Step', 'status_url')
 
     @mock.patch.object(timid_github.GithubExtension, '_set_status')
     def test_post_step_failure_withmsg(self, mock_set_status):
@@ -2077,7 +2469,7 @@ class TestGithubExtension(unittest.TestCase):
         obj.post_step('ctxt', step, 5, result)
 
         mock_set_status.assert_called_once_with(
-            'failure', 'message', 'status_url')
+            'ctxt', 'failure', 'message', 'status_url')
 
     @mock.patch.object(timid_github.GithubExtension, '_set_status')
     def test_post_step_error_nomsg(self, mock_set_status):
@@ -2092,7 +2484,7 @@ class TestGithubExtension(unittest.TestCase):
         obj.post_step('ctxt', step, 5, result)
 
         mock_set_status.assert_called_once_with(
-            'error', 'Error: Step', 'status_url')
+            'ctxt', 'error', 'Error: Step', 'status_url')
 
     @mock.patch.object(timid_github.GithubExtension, '_set_status')
     def test_post_step_error_withmsg(self, mock_set_status):
@@ -2107,7 +2499,7 @@ class TestGithubExtension(unittest.TestCase):
         obj.post_step('ctxt', step, 5, result)
 
         mock_set_status.assert_called_once_with(
-            'error', 'message', 'status_url')
+            'ctxt', 'error', 'message', 'status_url')
 
     @mock.patch.object(timid_github.GithubExtension, '_set_status')
     def test_post_step_other_nomsg(self, mock_set_status):
@@ -2122,7 +2514,7 @@ class TestGithubExtension(unittest.TestCase):
         obj.post_step('ctxt', step, 5, result)
 
         mock_set_status.assert_called_once_with(
-            'error', 'Unknown timid state "5" during step: Step',
+            'ctxt', 'error', 'Unknown timid state "5" during step: Step',
             'status_url')
 
     @mock.patch.object(timid_github.GithubExtension, '_set_status')
@@ -2138,7 +2530,7 @@ class TestGithubExtension(unittest.TestCase):
         obj.post_step('ctxt', step, 5, result)
 
         mock_set_status.assert_called_once_with(
-            'error', 'message', 'status_url')
+            'ctxt', 'error', 'message', 'status_url')
 
     @mock.patch.object(timid_github.GithubExtension, '_set_status')
     def test_finalize_none(self, mock_set_status):
@@ -2154,7 +2546,8 @@ class TestGithubExtension(unittest.TestCase):
 
         self.assertEqual(result, None)
         mock_set_status.assert_called_once_with(
-            status='success', text='Tests passed!', url='https://example.com')
+            'ctxt', status='success', text='Tests passed!',
+            url='https://example.com')
 
     @mock.patch.object(timid_github.GithubExtension, '_set_status')
     def test_finalize_exception(self, mock_set_status):
@@ -2171,7 +2564,7 @@ class TestGithubExtension(unittest.TestCase):
 
         self.assertEqual(result, exc)
         mock_set_status.assert_called_once_with(
-            'error', 'Exception while running timid: some failure',
+            'ctxt', 'error', 'Exception while running timid: some failure',
             'status_url')
 
     @mock.patch.object(timid_github.GithubExtension, '_set_status')
@@ -2224,4 +2617,4 @@ class TestGithubExtension(unittest.TestCase):
 
         self.assertEqual(result, 'text')
         mock_set_status.assert_called_once_with(
-            'failure', 'Testing failed: text', 'status_url')
+            'ctxt', 'failure', 'Testing failed: text', 'status_url')

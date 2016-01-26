@@ -39,7 +39,42 @@ class GitException(Exception):
     executing the "git" command.
     """
 
-    pass
+    def __init__(self, message, result=None):
+        """
+        Initialize a ``GitException`` object.
+
+        :param message: The exception message.
+        :param result: An optional ``timid.StepResult`` object.
+        """
+
+        # Initialize the superclass
+        super(GitException, self).__init__(message)
+
+        self.result = result
+
+
+def exc_to_result(func):
+    """
+    A decorator to convert an exception into an appropriate
+    ``timid.StepResult``.  This wrapper special-cases the
+    ``GitException`` to return the contents of the ``result``
+    attribute.
+
+    :param func: The function to wrap.
+
+    :returns: The wrapped function.
+    """
+
+    @six.wraps(func)
+    def wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except GitException as e:
+            return e.result
+        except Exception:
+            return timid.StepResult(exc_info=sys.exc_info())
+
+    return wrapper
 
 
 def _git(ctxt, *args, **kwargs):
@@ -72,6 +107,9 @@ def _git(ctxt, *args, **kwargs):
     cmd = ['git']
     cmd.extend(args)
 
+    # Construct the command text for debugging and error output
+    cmd_text = ' '.join(six.moves.shlex_quote(c) for c in cmd)
+
     # Loop the requisite number of times, with appropriate sleeps
     sleep_time = 1
     num_tries = 0
@@ -82,24 +120,44 @@ def _git(ctxt, *args, **kwargs):
             time.sleep(sleep_time)
             sleep_time <<= 1
 
+            ctxt.emit('Retry %d of %d: retrying command "%s"' %
+                      (num_tries, ssh_retries, cmd_text), debug=True)
+        else:
+            ctxt.emit('Executing command "%s"' % cmd_text, debug=True)
+
         # Run the command
         child = ctxt.environment.call(
             cmd, close_fds=True, stdout=subprocess.PIPE,
             stderr=subprocess.PIPE)
         stdout, stderr = child.communicate()
+        ctxt.emit('Command result: return code %d, stdout %r, stderr %r' %
+                  (child.returncode, stdout, stderr), debug=True)
 
         # Do we need to retry?
         if child.returncode and (SSH_ERROR in stdout or SSH_ERROR in stderr):
+            ctxt.emit('Retrying command after a sleep of %d seconds' %
+                      sleep_time, debug=True)
             continue
 
         # We have executed it!
         break
+    else:
+        ctxt.emit('Too many tries, exiting instead', debug=True)
 
     if do_raise and child.returncode:
-        # Reconstitute the command
-        command = ' '.join(six.moves.shlex_quote(c) for c in cmd)
-        raise GitException('Git command "%s" returned %d' %
-                           (command, child.returncode))
+        # Include stdout
+        text = stdout.strip()
+        if text:
+            msg = ('Git command "%s" returned %d: %s' %
+                   (cmd_text, child.returncode, text))
+        else:
+            msg = ('Git command "%s" returned %d' %
+                   (cmd_text, child.returncode))
+
+        # Raise the exception
+        result = timid.StepResult(state=timid.ERROR, msg=msg,
+                                  returncode=child.returncode)
+        raise GitException(msg, result)
 
     # Return the standard output
     return stdout
@@ -142,6 +200,7 @@ class CloneAction(timid.Action):
 
         pass  # pragma: no cover
 
+    @exc_to_result
     def __call__(self, ctxt):
         """
         Invoke the action.  This method will clone the repository into the
@@ -160,7 +219,8 @@ class CloneAction(timid.Action):
         except OSError as e:
             # Re-raise the error if it's not ENOENT
             if e.errno != errno.ENOENT:
-                raise
+                msg = 'Unable to stat repo directory %s' % repo_dir
+                return timid.StepResult(msg=msg, exc_info=sys.exc_info())
 
             # OK, safe to clone from scratch
             return self._clone(work_dir, repo_dir, ctxt)
@@ -169,6 +229,8 @@ class CloneAction(timid.Action):
         if not stat.S_ISDIR(dir_data.st_mode):
             # OK, we control the workdir, so delete the extraneous
             # file and clone from scratch
+            ctxt.emit('Deleting file shadowing repository directory %s' %
+                      repo_dir, level=2)
             os.remove(repo_dir)
             return self._clone(work_dir, repo_dir, ctxt)
 
@@ -181,10 +243,14 @@ class CloneAction(timid.Action):
             except Exception:
                 # Failed to update, so back out of the directory
                 # temporarily
+                ctxt.emit('Failed to update existing repository in '
+                          'directory %s; starting from scratch' % repo_dir)
                 ctxt.environment.cwd = work_dir
 
         # Not a repository, or couldn't update; blow it away and try
         # cloning from scratch
+        ctxt.emit('Deleting directory tree shadowing repository directory %s' %
+                  repo_dir, level=2)
         shutil.rmtree(repo_dir)
         return self._clone(work_dir, repo_dir, ctxt)
 
@@ -202,6 +268,8 @@ class CloneAction(timid.Action):
         """
 
         # Begin by cloning the repository
+        ctxt.emit('Cloning repository from %s into directory %s' %
+                  (self.ghe.repo_url, target_dir))
         _git(ctxt, 'clone', self.ghe.repo_url, target_dir, ssh_retries=5)
 
         # Change to the target directory and fetch any changes
@@ -227,16 +295,21 @@ class CloneAction(timid.Action):
         :returns: A ``timid.StepResult`` object.
         """
 
+        ctxt.emit('Updating repository from upstream data')
+
         # Ensure the remote is set properly
         _git(ctxt, 'remote', 'set-url', 'origin', self.ghe.repo_url)
 
         # Do some initial resets
+        ctxt.emit('Cleaning up repository...', level=2)
         _git(ctxt, 'rebase', '--abort', do_raise=False)
         _git(ctxt, 'checkout', '-f', self.ghe.repo_branch)
         _git(ctxt, 'reset', '--hard', 'origin/%s' % self.ghe.repo_branch)
         _git(ctxt, 'clean', '-fdx')
 
         # And check out the designated branch
+        ctxt.emit('Checking out most recent version of branch %s' %
+                  self.ghe.repo_branch, level=2)
         _git(ctxt, 'fetch', 'origin', self.ghe.repo_branch, ssh_retries=5)
         _git(ctxt, 'checkout', self.ghe.repo_branch)
 
@@ -280,6 +353,7 @@ class MergeAction(timid.Action):
 
         pass  # pragma: no cover
 
+    @exc_to_result
     def __call__(self, ctxt):
         """
         Invoke the action.  This method will create the appropriate branch
@@ -294,14 +368,20 @@ class MergeAction(timid.Action):
         local_branch = ('%s-%s' %
                         (self.ghe.pull.user.login, self.ghe.change_branch))
 
+        ctxt.emit('Cloning pull request from %s branch %s '
+                  'into local branch %s' %
+                  (self.ghe.pull.user.login, self.ghe.change_branch,
+                   local_branch))
+
         # Make sure the branch doesn't already exist
         _git(ctxt, 'branch', '-D', local_branch, do_raise=False)
 
         # Create the branch
         _git(ctxt, 'checkout', '-b', local_branch, self.ghe.repo_branch)
+        _git(ctxt, 'pull', self.ghe.change_url, self.ghe.change_branch)
 
         # Merge the change
-        _git(ctxt, 'pull', self.ghe.change_url, self.ghe.change_branch)
+        ctxt.emit('Merging the change into branch %s' % self.ghe.repo_branch)
         _git(ctxt, 'checkout', self.ghe.repo_branch)
         _git(ctxt, 'merge', local_branch)
 
@@ -494,6 +574,8 @@ class GithubExtension(timid.Extension):
         if not args.github_pull:
             return None
 
+        ctxt.emit('Github plugin activated')
+
         # Ensure we have a password
         service = 'timid-github!%s' % args.github_api
         passwd = args.github_pass
@@ -507,6 +589,7 @@ class GithubExtension(timid.Extension):
 
         # Are we supposed to set it?
         if args.github_keyring_set:
+            ctxt.emit('Saving password in keyring as requested')
             keyring.set_password(service, args.github_user, passwd)
 
         # Now we have authentication information, get a Github handle
@@ -522,6 +605,7 @@ class GithubExtension(timid.Extension):
 
             # Interpret the number
             if not number or not number.isdigit():
+                ctxt.emit('Invalid pull request number "%s"' % number, level=0)
                 return None
             number = int(number)
 
@@ -536,11 +620,16 @@ class GithubExtension(timid.Extension):
                 pull = repo.get_pull(number)
             except Exception:
                 # No such pull request, I guess
+                ctxt.emit('Unable to resolve pull request "%s"' %
+                          args.github_pull, level=0)
                 return None
         else:
             # OK, we have raw JSON data; wrap it in a PullRequest
             pull = gh.create_from_raw_data(
                 github.PullRequest.PullRequest, pull_raw)
+
+        ctxt.emit('Testing pull request %s#%d' %
+                  (pull.base.repo.full_name, pull.number))
 
         # Need the repository name
         repo_name = pull.base.repo.name
@@ -551,6 +640,7 @@ class GithubExtension(timid.Extension):
 
         # Select the correct repository URL
         repo_url = _select_url(args.github_repo, pull.base.repo)
+        ctxt.emit('Base repository %s' % repo_url, level=2)
 
         # Select the correct change repository URL.  If not
         # independently specified, default to the same as the
@@ -559,6 +649,7 @@ class GithubExtension(timid.Extension):
         # repository.
         change_url = _select_url(args.github_change_repo or args.github_repo,
                                  pull.head.repo)
+        ctxt.emit('PR repository %s' % change_url, level=2)
 
         # With the pull, we need to select an appropriate commit
         last_commit = list(pull.get_commits())[-1]
@@ -656,10 +747,11 @@ class GithubExtension(timid.Extension):
         # Remember what the last status was
         self.last_status = None
 
-    def _set_status(self, status, text=None, url=None):
+    def _set_status(self, ctxt, status, text=None, url=None):
         """
         A helper method to set the status of a pull request.
 
+        :param ctxt: An instance of ``timid.context.Context``.
         :param status: The desired status.  Should be one of the
                        values "pending", "success", "failure", or
                        "error".
@@ -673,6 +765,10 @@ class GithubExtension(timid.Extension):
             url or github.GithubObject.NotSet,
             text or github.GithubObject.NotSet,
         )
+
+        ctxt.emit('Changing status to "%s" (text "%s"%s%s)' %
+                  (status, text, ', url ' if url else '', url or ''),
+                  debug=True)
 
         # Remember it so we only make calls we need to
         self.last_status = {
@@ -695,6 +791,7 @@ class GithubExtension(timid.Extension):
         fname = inspect.getsourcefile(self.__class__)
 
         # Prepend our steps to the list of steps read
+        ctxt.emit('Prepending clone and merge steps', debug=True)
         steps[0:0] = [
             # First step will be to clone the repository
             timid.Step(timid.StepAddress(fname, 0),
@@ -724,7 +821,7 @@ class GithubExtension(timid.Extension):
         """
 
         # Update the pull request status
-        self._set_status('pending', step.name, self.status_url)
+        self._set_status(ctxt, 'pending', step.name, self.status_url)
 
         return None
 
@@ -759,7 +856,7 @@ class GithubExtension(timid.Extension):
                         msg = 'Error: %s' % step.name
 
             # Update the status
-            self._set_status(status, msg, self.status_url)
+            self._set_status(ctxt, status, msg, self.status_url)
 
     def finalize(self, ctxt, result):
         """
@@ -780,15 +877,16 @@ class GithubExtension(timid.Extension):
 
         # If result is None, update the status to success
         if result is None:
-            self._set_status(**self.final_status)
+            self._set_status(ctxt, **self.final_status)
         elif isinstance(result, Exception):
             # An exception occurred while running timid; log it as an
             # error status
-            self._set_status('error', 'Exception while running timid: %s' %
-                             result, self.status_url)
+            self._set_status(ctxt, 'error',
+                             'Exception while running timid: %s' % result,
+                             self.status_url)
         elif self.last_status and self.last_status['status'] == 'pending':
             # A test failed and we haven't reported it; do so
-            self._set_status('failure', 'Testing failed: %s' % result,
+            self._set_status(ctxt, 'failure', 'Testing failed: %s' % result,
                              self.status_url)
 
         return result
