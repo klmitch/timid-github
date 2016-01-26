@@ -809,6 +809,8 @@ class TestGithubExtension(unittest.TestCase):
 
         return pull
 
+    @mock.patch.object(timid_github.sys, 'exit',
+                       side_effect=TestException('exit'))
     @mock.patch.object(timid_github.getpass, 'getpass',
                        return_value='from_keyboard')
     @mock.patch.object(timid_github.github, 'Github', **{
@@ -822,7 +824,8 @@ class TestGithubExtension(unittest.TestCase):
     @mock.patch.object(timid_github.GithubExtension, '__init__',
                        return_value=None)
     def test_activate_base(self, mock_init, mock_select_url, mock_set_password,
-                           mock_get_password, mock_Github, mock_getpass):
+                           mock_get_password, mock_Github, mock_getpass,
+                           mock_exit):
         ctxt = mock.Mock()
         pull = self.make_pull(mock_Github)
         args = mock.Mock(
@@ -891,7 +894,10 @@ class TestGithubExtension(unittest.TestCase):
             mock.call('PR repository change-repo-url', level=2),
         ])
         self.assertEqual(ctxt.emit.call_count, 4)
+        self.assertFalse(mock_exit.called)
 
+    @mock.patch.object(timid_github.sys, 'exit',
+                       side_effect=TestException('exit'))
     @mock.patch.object(timid_github.getpass, 'getpass',
                        return_value='from_keyboard')
     @mock.patch.object(timid_github.github, 'Github', **{
@@ -906,7 +912,7 @@ class TestGithubExtension(unittest.TestCase):
                        return_value=None)
     def test_activate_nopull(self, mock_init, mock_select_url,
                              mock_set_password, mock_get_password, mock_Github,
-                             mock_getpass):
+                             mock_getpass, mock_exit):
         ctxt = mock.Mock()
         pull = self.make_pull(mock_Github)
         args = mock.Mock(
@@ -935,7 +941,10 @@ class TestGithubExtension(unittest.TestCase):
         self.assertEqual(len(ctxt.variables.method_calls), 0)
         self.assertFalse(mock_init.called)
         self.assertFalse(ctxt.emit.called)
+        self.assertFalse(mock_exit.called)
 
+    @mock.patch.object(timid_github.sys, 'exit',
+                       side_effect=TestException('exit'))
     @mock.patch.object(timid_github.getpass, 'getpass',
                        return_value='from_keyboard')
     @mock.patch.object(timid_github.github, 'Github', **{
@@ -950,7 +959,7 @@ class TestGithubExtension(unittest.TestCase):
                        return_value=None)
     def test_activate_withpass(self, mock_init, mock_select_url,
                                mock_set_password, mock_get_password,
-                               mock_Github, mock_getpass):
+                               mock_Github, mock_getpass, mock_exit):
         ctxt = mock.Mock()
         pull = self.make_pull(mock_Github)
         args = mock.Mock(
@@ -1018,7 +1027,10 @@ class TestGithubExtension(unittest.TestCase):
             mock.call('PR repository change-repo-url', level=2),
         ])
         self.assertEqual(ctxt.emit.call_count, 4)
+        self.assertFalse(mock_exit.called)
 
+    @mock.patch.object(timid_github.sys, 'exit',
+                       side_effect=TestException('exit'))
     @mock.patch.object(timid_github.getpass, 'getpass',
                        return_value='from_keyboard')
     @mock.patch.object(timid_github.github, 'Github', **{
@@ -1033,7 +1045,7 @@ class TestGithubExtension(unittest.TestCase):
                        return_value=None)
     def test_activate_nokeyring(self, mock_init, mock_select_url,
                                 mock_set_password, mock_get_password,
-                                mock_Github, mock_getpass):
+                                mock_Github, mock_getpass, mock_exit):
         ctxt = mock.Mock()
         pull = self.make_pull(mock_Github)
         args = mock.Mock(
@@ -1103,7 +1115,10 @@ class TestGithubExtension(unittest.TestCase):
             mock.call('PR repository change-repo-url', level=2),
         ])
         self.assertEqual(ctxt.emit.call_count, 4)
+        self.assertFalse(mock_exit.called)
 
+    @mock.patch.object(timid_github.sys, 'exit',
+                       side_effect=TestException('exit'))
     @mock.patch.object(timid_github.getpass, 'getpass',
                        return_value='from_keyboard')
     @mock.patch.object(timid_github.github, 'Github', **{
@@ -1118,7 +1133,7 @@ class TestGithubExtension(unittest.TestCase):
                        return_value=None)
     def test_activate_set_keyring(self, mock_init, mock_select_url,
                                   mock_set_password, mock_get_password,
-                                  mock_Github, mock_getpass):
+                                  mock_Github, mock_getpass, mock_exit):
         ctxt = mock.Mock()
         pull = self.make_pull(mock_Github)
         args = mock.Mock(
@@ -1189,7 +1204,10 @@ class TestGithubExtension(unittest.TestCase):
             mock.call('PR repository change-repo-url', level=2),
         ])
         self.assertEqual(ctxt.emit.call_count, 5)
+        self.assertFalse(mock_exit.called)
 
+    @mock.patch.object(timid_github.sys, 'exit',
+                       side_effect=TestException('exit'))
     @mock.patch.object(timid_github.getpass, 'getpass',
                        return_value='from_keyboard')
     @mock.patch.object(timid_github.github, 'Github', **{
@@ -1204,7 +1222,7 @@ class TestGithubExtension(unittest.TestCase):
                        return_value=None)
     def test_activate_empty_pull_number(self, mock_init, mock_select_url,
                                         mock_set_password, mock_get_password,
-                                        mock_Github, mock_getpass):
+                                        mock_Github, mock_getpass, mock_exit):
         ctxt = mock.Mock()
         pull = self.make_pull(mock_Github)
         args = mock.Mock(
@@ -1222,9 +1240,8 @@ class TestGithubExtension(unittest.TestCase):
             github_override_url=None,
         )
 
-        result = timid_github.GithubExtension.activate(ctxt, args)
-
-        self.assertEqual(result, None)
+        self.assertRaises(TestException,
+                          timid_github.GithubExtension.activate, ctxt, args)
         mock_get_password.assert_called_once_with(
             'timid-github!https://api.github.com', 'example')
         self.assertFalse(mock_getpass.called)
@@ -1238,12 +1255,11 @@ class TestGithubExtension(unittest.TestCase):
         self.assertFalse(mock_select_url.called)
         self.assertEqual(len(ctxt.variables.method_calls), 0)
         self.assertFalse(mock_init.called)
-        ctxt.emit.assert_has_calls([
-            mock.call('Github plugin activated'),
-            mock.call('Invalid pull request number ""', level=0),
-        ])
-        self.assertEqual(ctxt.emit.call_count, 2)
+        ctxt.emit.assert_called_once_with('Github plugin activated')
+        mock_exit.assert_called_once_with('Invalid pull request number ""')
 
+    @mock.patch.object(timid_github.sys, 'exit',
+                       side_effect=TestException('exit'))
     @mock.patch.object(timid_github.getpass, 'getpass',
                        return_value='from_keyboard')
     @mock.patch.object(timid_github.github, 'Github', **{
@@ -1258,7 +1274,7 @@ class TestGithubExtension(unittest.TestCase):
                        return_value=None)
     def test_activate_bad_pull_number(self, mock_init, mock_select_url,
                                       mock_set_password, mock_get_password,
-                                      mock_Github, mock_getpass):
+                                      mock_Github, mock_getpass, mock_exit):
         ctxt = mock.Mock()
         pull = self.make_pull(mock_Github)
         args = mock.Mock(
@@ -1276,9 +1292,8 @@ class TestGithubExtension(unittest.TestCase):
             github_override_url=None,
         )
 
-        result = timid_github.GithubExtension.activate(ctxt, args)
-
-        self.assertEqual(result, None)
+        self.assertRaises(TestException,
+                          timid_github.GithubExtension.activate, ctxt, args)
         mock_get_password.assert_called_once_with(
             'timid-github!https://api.github.com', 'example')
         self.assertFalse(mock_getpass.called)
@@ -1292,12 +1307,11 @@ class TestGithubExtension(unittest.TestCase):
         self.assertFalse(mock_select_url.called)
         self.assertEqual(len(ctxt.variables.method_calls), 0)
         self.assertFalse(mock_init.called)
-        ctxt.emit.assert_has_calls([
-            mock.call('Github plugin activated'),
-            mock.call('Invalid pull request number "x"', level=0),
-        ])
-        self.assertEqual(ctxt.emit.call_count, 2)
+        ctxt.emit.assert_called_once_with('Github plugin activated')
+        mock_exit.assert_called_once_with('Invalid pull request number "x"')
 
+    @mock.patch.object(timid_github.sys, 'exit',
+                       side_effect=TestException('exit'))
     @mock.patch.object(timid_github.getpass, 'getpass',
                        return_value='from_keyboard')
     @mock.patch.object(timid_github.github, 'Github', **{
@@ -1312,7 +1326,7 @@ class TestGithubExtension(unittest.TestCase):
                        return_value=None)
     def test_activate_no_pull_object(self, mock_init, mock_select_url,
                                      mock_set_password, mock_get_password,
-                                     mock_Github, mock_getpass):
+                                     mock_Github, mock_getpass, mock_exit):
         mock_Github.return_value.get_repo.side_effect = TestException()
         ctxt = mock.Mock()
         args = mock.Mock(
@@ -1330,9 +1344,8 @@ class TestGithubExtension(unittest.TestCase):
             github_override_url=None,
         )
 
-        result = timid_github.GithubExtension.activate(ctxt, args)
-
-        self.assertEqual(result, None)
+        self.assertRaises(TestException,
+                          timid_github.GithubExtension.activate, ctxt, args)
         mock_get_password.assert_called_once_with(
             'timid-github!https://api.github.com', 'example')
         self.assertFalse(mock_getpass.called)
@@ -1346,12 +1359,12 @@ class TestGithubExtension(unittest.TestCase):
         self.assertFalse(mock_select_url.called)
         self.assertEqual(len(ctxt.variables.method_calls), 0)
         self.assertFalse(mock_init.called)
-        ctxt.emit.assert_has_calls([
-            mock.call('Github plugin activated'),
-            mock.call('Unable to resolve pull request "some/repo#5"', level=0),
-        ])
-        self.assertEqual(ctxt.emit.call_count, 2)
+        ctxt.emit.assert_called_once_with('Github plugin activated')
+        mock_exit.assert_called_once_with(
+            'Unable to resolve pull request "some/repo#5"')
 
+    @mock.patch.object(timid_github.sys, 'exit',
+                       side_effect=TestException('exit'))
     @mock.patch.object(timid_github.getpass, 'getpass',
                        return_value='from_keyboard')
     @mock.patch.object(timid_github.github, 'Github', **{
@@ -1366,7 +1379,7 @@ class TestGithubExtension(unittest.TestCase):
                        return_value=None)
     def test_activate_unqualified_repo(self, mock_init, mock_select_url,
                                        mock_set_password, mock_get_password,
-                                       mock_Github, mock_getpass):
+                                       mock_Github, mock_getpass, mock_exit):
         ctxt = mock.Mock()
         pull = self.make_pull(mock_Github)
         args = mock.Mock(
@@ -1435,7 +1448,10 @@ class TestGithubExtension(unittest.TestCase):
             mock.call('PR repository change-repo-url', level=2),
         ])
         self.assertEqual(ctxt.emit.call_count, 4)
+        self.assertFalse(mock_exit.called)
 
+    @mock.patch.object(timid_github.sys, 'exit',
+                       side_effect=TestException('exit'))
     @mock.patch.object(timid_github.getpass, 'getpass',
                        return_value='from_keyboard')
     @mock.patch.object(timid_github.github, 'Github', **{
@@ -1450,7 +1466,7 @@ class TestGithubExtension(unittest.TestCase):
                        return_value=None)
     def test_activate_json_pull(self, mock_init, mock_select_url,
                                 mock_set_password, mock_get_password,
-                                mock_Github, mock_getpass):
+                                mock_Github, mock_getpass, mock_exit):
         ctxt = mock.Mock()
         pull = self.make_pull(mock_Github)
         args = mock.Mock(
@@ -1520,7 +1536,10 @@ class TestGithubExtension(unittest.TestCase):
             mock.call('PR repository change-repo-url', level=2),
         ])
         self.assertEqual(ctxt.emit.call_count, 4)
+        self.assertFalse(mock_exit.called)
 
+    @mock.patch.object(timid_github.sys, 'exit',
+                       side_effect=TestException('exit'))
     @mock.patch.object(timid_github.getpass, 'getpass',
                        return_value='from_keyboard')
     @mock.patch.object(timid_github.github, 'Github', **{
@@ -1536,7 +1555,7 @@ class TestGithubExtension(unittest.TestCase):
     def test_activate_alternate_change_repo(self, mock_init, mock_select_url,
                                             mock_set_password,
                                             mock_get_password, mock_Github,
-                                            mock_getpass):
+                                            mock_getpass, mock_exit):
         ctxt = mock.Mock()
         pull = self.make_pull(mock_Github)
         args = mock.Mock(
@@ -1605,7 +1624,10 @@ class TestGithubExtension(unittest.TestCase):
             mock.call('PR repository change-repo-url', level=2),
         ])
         self.assertEqual(ctxt.emit.call_count, 4)
+        self.assertFalse(mock_exit.called)
 
+    @mock.patch.object(timid_github.sys, 'exit',
+                       side_effect=TestException('exit'))
     @mock.patch.object(timid_github.getpass, 'getpass',
                        return_value='from_keyboard')
     @mock.patch.object(timid_github.github, 'Github', **{
@@ -1620,7 +1642,7 @@ class TestGithubExtension(unittest.TestCase):
                        return_value=None)
     def test_activate_override_compat(self, mock_init, mock_select_url,
                                       mock_set_password, mock_get_password,
-                                      mock_Github, mock_getpass):
+                                      mock_Github, mock_getpass, mock_exit):
         ctxt = mock.Mock()
         pull = self.make_pull(mock_Github)
         args = mock.Mock(
@@ -1694,7 +1716,10 @@ class TestGithubExtension(unittest.TestCase):
             mock.call('PR repository change-repo-url', level=2),
         ])
         self.assertEqual(ctxt.emit.call_count, 4)
+        self.assertFalse(mock_exit.called)
 
+    @mock.patch.object(timid_github.sys, 'exit',
+                       side_effect=TestException('exit'))
     @mock.patch.object(timid_github.getpass, 'getpass',
                        return_value='from_keyboard')
     @mock.patch.object(timid_github.github, 'Github', **{
@@ -1711,7 +1736,8 @@ class TestGithubExtension(unittest.TestCase):
                                                   mock_select_url,
                                                   mock_set_password,
                                                   mock_get_password,
-                                                  mock_Github, mock_getpass):
+                                                  mock_Github, mock_getpass,
+                                                  mock_exit):
         ctxt = mock.Mock()
         pull = self.make_pull(mock_Github)
         args = mock.Mock(
@@ -1784,7 +1810,10 @@ class TestGithubExtension(unittest.TestCase):
             mock.call('PR repository change-repo-url', level=2),
         ])
         self.assertEqual(ctxt.emit.call_count, 4)
+        self.assertFalse(mock_exit.called)
 
+    @mock.patch.object(timid_github.sys, 'exit',
+                       side_effect=TestException('exit'))
     @mock.patch.object(timid_github.getpass, 'getpass',
                        return_value='from_keyboard')
     @mock.patch.object(timid_github.github, 'Github', **{
@@ -1800,7 +1829,7 @@ class TestGithubExtension(unittest.TestCase):
     def test_activate_override_compat_invalid(self, mock_init, mock_select_url,
                                               mock_set_password,
                                               mock_get_password, mock_Github,
-                                              mock_getpass):
+                                              mock_getpass, mock_exit):
         ctxt = mock.Mock()
         pull = self.make_pull(mock_Github)
         args = mock.Mock(
@@ -1869,7 +1898,10 @@ class TestGithubExtension(unittest.TestCase):
             mock.call('PR repository change-repo-url', level=2),
         ])
         self.assertEqual(ctxt.emit.call_count, 4)
+        self.assertFalse(mock_exit.called)
 
+    @mock.patch.object(timid_github.sys, 'exit',
+                       side_effect=TestException('exit'))
     @mock.patch.object(timid_github.getpass, 'getpass',
                        return_value='from_keyboard')
     @mock.patch.object(timid_github.github, 'Github', **{
@@ -1884,7 +1916,7 @@ class TestGithubExtension(unittest.TestCase):
                        return_value=None)
     def test_activate_override_status(self, mock_init, mock_select_url,
                                       mock_set_password, mock_get_password,
-                                      mock_Github, mock_getpass):
+                                      mock_Github, mock_getpass, mock_exit):
         ctxt = mock.Mock()
         pull = self.make_pull(mock_Github)
         args = mock.Mock(
@@ -1953,7 +1985,10 @@ class TestGithubExtension(unittest.TestCase):
             mock.call('PR repository change-repo-url', level=2),
         ])
         self.assertEqual(ctxt.emit.call_count, 4)
+        self.assertFalse(mock_exit.called)
 
+    @mock.patch.object(timid_github.sys, 'exit',
+                       side_effect=TestException('exit'))
     @mock.patch.object(timid_github.getpass, 'getpass',
                        return_value='from_keyboard')
     @mock.patch.object(timid_github.github, 'Github', **{
@@ -1968,7 +2003,7 @@ class TestGithubExtension(unittest.TestCase):
                        return_value=None)
     def test_activate_override_text(self, mock_init, mock_select_url,
                                     mock_set_password, mock_get_password,
-                                    mock_Github, mock_getpass):
+                                    mock_Github, mock_getpass, mock_exit):
         ctxt = mock.Mock()
         pull = self.make_pull(mock_Github)
         args = mock.Mock(
@@ -2037,7 +2072,10 @@ class TestGithubExtension(unittest.TestCase):
             mock.call('PR repository change-repo-url', level=2),
         ])
         self.assertEqual(ctxt.emit.call_count, 4)
+        self.assertFalse(mock_exit.called)
 
+    @mock.patch.object(timid_github.sys, 'exit',
+                       side_effect=TestException('exit'))
     @mock.patch.object(timid_github.getpass, 'getpass',
                        return_value='from_keyboard')
     @mock.patch.object(timid_github.github, 'Github', **{
@@ -2052,7 +2090,7 @@ class TestGithubExtension(unittest.TestCase):
                        return_value=None)
     def test_activate_override_url(self, mock_init, mock_select_url,
                                    mock_set_password, mock_get_password,
-                                   mock_Github, mock_getpass):
+                                   mock_Github, mock_getpass, mock_exit):
         ctxt = mock.Mock()
         pull = self.make_pull(mock_Github)
         args = mock.Mock(
@@ -2121,7 +2159,10 @@ class TestGithubExtension(unittest.TestCase):
             mock.call('PR repository change-repo-url', level=2),
         ])
         self.assertEqual(ctxt.emit.call_count, 4)
+        self.assertFalse(mock_exit.called)
 
+    @mock.patch.object(timid_github.sys, 'exit',
+                       side_effect=TestException('exit'))
     @mock.patch.object(timid_github.getpass, 'getpass',
                        return_value='from_keyboard')
     @mock.patch.object(timid_github.github, 'Github', **{
@@ -2138,7 +2179,8 @@ class TestGithubExtension(unittest.TestCase):
                                                  mock_select_url,
                                                  mock_set_password,
                                                  mock_get_password,
-                                                 mock_Github, mock_getpass):
+                                                 mock_Github, mock_getpass,
+                                                 mock_exit):
         ctxt = mock.Mock()
         pull = self.make_pull(mock_Github)
         args = mock.Mock(
@@ -2212,7 +2254,10 @@ class TestGithubExtension(unittest.TestCase):
             mock.call('PR repository change-repo-url', level=2),
         ])
         self.assertEqual(ctxt.emit.call_count, 4)
+        self.assertFalse(mock_exit.called)
 
+    @mock.patch.object(timid_github.sys, 'exit',
+                       side_effect=TestException('exit'))
     @mock.patch.object(timid_github.getpass, 'getpass',
                        return_value='from_keyboard')
     @mock.patch.object(timid_github.github, 'Github', **{
@@ -2227,7 +2272,7 @@ class TestGithubExtension(unittest.TestCase):
                        return_value=None)
     def test_activate_status_url(self, mock_init, mock_select_url,
                                  mock_set_password, mock_get_password,
-                                 mock_Github, mock_getpass):
+                                 mock_Github, mock_getpass, mock_exit):
         ctxt = mock.Mock()
         pull = self.make_pull(mock_Github)
         args = mock.Mock(
@@ -2296,6 +2341,7 @@ class TestGithubExtension(unittest.TestCase):
             mock.call('PR repository change-repo-url', level=2),
         ])
         self.assertEqual(ctxt.emit.call_count, 4)
+        self.assertFalse(mock_exit.called)
 
     def test_init(self):
         result = timid_github.GithubExtension(

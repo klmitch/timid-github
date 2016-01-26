@@ -605,8 +605,7 @@ class GithubExtension(timid.Extension):
 
             # Interpret the number
             if not number or not number.isdigit():
-                ctxt.emit('Invalid pull request number "%s"' % number, level=0)
-                return None
+                sys.exit('Invalid pull request number "%s"' % number)
             number = int(number)
 
             # Interpret the repo
@@ -620,9 +619,8 @@ class GithubExtension(timid.Extension):
                 pull = repo.get_pull(number)
             except Exception:
                 # No such pull request, I guess
-                ctxt.emit('Unable to resolve pull request "%s"' %
-                          args.github_pull, level=0)
-                return None
+                sys.exit('Unable to resolve pull request "%s"' %
+                         args.github_pull)
         else:
             # OK, we have raw JSON data; wrap it in a PullRequest
             pull = gh.create_from_raw_data(
